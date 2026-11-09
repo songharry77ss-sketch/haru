@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { HelpSheet, Toasts } from './components/Overlay'
+import { initNative } from './lib/native'
 import { HaruProvider, asset, useHaru } from './lib/store'
 import { Analysis } from './screens/Analysis'
 import { Chat } from './screens/Chat'
@@ -18,6 +19,17 @@ function Shell() {
   const [analysisTab, setAnalysisTab] = useState<'diary' | 'behavior' | 'report'>('diary')
   const [firstVisit] = useState(() => sessionStorage.getItem('haru.first') === '1')
   const close = useCallback(() => setOverlay(null), [])
+  const open = useRef<Overlay>(null)
+  open.current = overlay
+  useEffect(() => {
+    initNative(() => {
+      if (open.current) {
+        setOverlay(null)
+        return true
+      }
+      return false
+    })
+  }, [])
 
   if (booting)
     return (

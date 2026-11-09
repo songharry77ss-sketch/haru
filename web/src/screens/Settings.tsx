@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, Phone } from '../components/Icons'
 import { Panel, Sheet } from '../components/Overlay'
-import { api } from '../lib/api'
+import { PUBLIC_URL, api } from '../lib/api'
 import { useHaru } from '../lib/store'
 
 export function Settings({ onClose }: { onClose: () => void }) {
@@ -11,7 +11,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   if (!state) return null
   const { user } = state
-  const guardianUrl = `${location.origin}/guardian/${user.guardianCode}`
+  const guardianUrl = `${PUBLIC_URL}/guardian/${user.guardianCode}`
 
   const save = async (body: Parameters<typeof api.settings>[0]) => {
     try {
@@ -120,6 +120,19 @@ export function Settings({ onClose }: { onClose: () => void }) {
             대화 모드: {state.ai === 'model' ? 'AI 대화 (Claude)' : '간단한 대화 모드'}
             <br />
             하루는 상담·치료를 대신하지 않아요. 마음이 많이 힘들 땐 꼭 주변 어른이나 전문가와 이야기해 주세요.
+          </p>
+          <p className="small links">
+            <a href={`${PUBLIC_URL}/privacy`} target="_blank" rel="noreferrer">
+              개인정보처리방침
+            </a>
+            {' · '}
+            <a href={`${PUBLIC_URL}/terms`} target="_blank" rel="noreferrer">
+              이용약관
+            </a>
+            {' · '}
+            <a href={`${PUBLIC_URL}/support`} target="_blank" rel="noreferrer">
+              고객지원
+            </a>
           </p>
           <button className="link danger" onClick={() => setConfirmDelete(true)}>
             모든 기록 지우고 처음부터 시작하기

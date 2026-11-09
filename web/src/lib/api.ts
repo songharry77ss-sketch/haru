@@ -132,6 +132,11 @@ export class ApiError extends Error {
 
 const TOKEN_KEY = 'haru.token'
 
+/** Empty on the web (same origin). Native builds point at the deployed server, e.g. https://haru.example.com */
+export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ?? ''
+/** Public web address used for links shared with guardians. */
+export const PUBLIC_URL: string = API_BASE || (typeof location !== 'undefined' ? location.origin : '')
+
 export const token = {
   get(): string | null {
     try {
@@ -165,7 +170,7 @@ export async function request<T>(path: string, init: { method?: string; body?: u
   if (init.body !== undefined) headers['content-type'] = 'application/json'
   let res: Response
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${API_BASE}/api${path}`, {
       method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
       headers,
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">하루</string>
+    <string name="title_activity_main">하루</string>
+    <string name="package_name">kr.haru.companion</string>
+    <string name="custom_url_scheme">kr.haru.companion</string>
+</resources>

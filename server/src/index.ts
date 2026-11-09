@@ -27,9 +27,26 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
 app.use(compression());
+
+// The iOS/Android apps load the UI from the device and call this API cross-origin.
+const NATIVE_ORIGINS = new Set(["capacitor://localhost", "https://localhost", "http://localhost", "ionic://localhost"]);
+const EXTRA_ORIGINS = new Set((process.env.CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+app.use("/api", (req, res, next) => {
+  const origin = req.get("origin");
+  if (origin && (NATIVE_ORIGINS.has(origin) || EXTRA_ORIGINS.has(origin))) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Max-Age", "86400");
+  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 app.use(express.json({ limit: "32kb" }));
 
 app.use("/api", api);
@@ -39,6 +56,7 @@ if (fs.existsSync(WEB_DIST)) {
   app.use(
     express.static(WEB_DIST, {
       index: false,
+      extensions: ["html"],
       setHeaders(res, file) {
         // Vite's hashed bundles never change; artwork under /img may be swapped, so it revalidates daily.
         if (file.includes(`${path.sep}assets${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");

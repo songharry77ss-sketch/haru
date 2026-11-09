@@ -4,6 +4,7 @@ import { Stage } from '../components/Stage'
 import type { CharacterHandle, TouchSummary } from '../components/Character'
 import { Bolt, Carrot, Chart, Coin, Gear, Gem, Paw, Search, Send, Shirt, Store } from '../components/Icons'
 import { api } from '../lib/api'
+import { tap } from '../lib/native'
 import { asset, useHaru } from '../lib/store'
 
 export type Overlay = 'chat' | 'wardrobe' | 'shop' | 'analysis' | 'settings' | 'play' | 'quests' | null
@@ -31,7 +32,10 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
     try {
       const r = apply(await api.touch(s))
       say(r.line)
-      if (!r.rough) charRef.current?.hearts(3)
+      if (!r.rough) {
+        charRef.current?.hearts(3)
+        tap()
+      }
       rewardToast(r.reward)
     } catch (e) {
       fail(e)
@@ -45,6 +49,7 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
       const r = apply(await api.feed(food))
       say(r.line)
       if (!r.refused) {
+        tap('medium')
         charRef.current?.bounce()
         charRef.current?.hearts(2)
       }
