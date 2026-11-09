@@ -1,0 +1,14 @@
+{
+  "name": "하루 haru",
+  "short_name": "하루",
+  "description": "말하지 못한 마음을 가장 먼저 알아주는 AI 친구",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf6f0",
+  "theme_color": "#fbf6f0",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

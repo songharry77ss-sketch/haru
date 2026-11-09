@@ -214,7 +214,9 @@ export function report(userId: string, days = 7, now = Date.now()) {
     joyful: 1.5 * Math.max(0, v.sentiment) + 0.7 * v.playRate + 0.5 * v.gentleShare * v.touchFrequency,
     stable: 1.3 * v.routineAdherence + 0.6 * (1 - v.volatility) + 0.5 * v.gentleShare + 0.3 * (1 - v.lateNightRatio),
   };
-  const T = 0.35;
+  // Little data → softer distribution, so a brand-new account never reads as "99% 안정".
+  const n0 = v.sample.touches + v.sample.chats + v.sample.diaries + v.sample.plays;
+  const T = n0 >= 40 ? 0.35 : n0 >= 12 ? 0.55 : 0.9;
   const exps = Object.fromEntries(Object.entries(scores).map(([k, s]) => [k, Math.exp(s / T)])) as Record<StateKey, number>;
   const z = Object.values(exps).reduce((a, b) => a + b, 0);
   const dist = Object.fromEntries(
@@ -260,6 +262,8 @@ export function report(userId: string, days = 7, now = Date.now()) {
   if (v.lateNightRatio > 0.3) evidence.push("늦은 밤 접속이 잦았어요. 잠이 부족하지 않은지 살펴봐 주세요.");
   if (!evidence.length) evidence.push("하루와 함께한 시간이 쌓이면 더 정확한 리포트를 보여줄게요.");
 
+  const created = (createdStmt.get(userId) as { created_at: number }).created_at;
+  const spanDays = Math.max(1, Math.min(days, Math.ceil((now - dayStart(created)) / 86_400_000)));
   const level = (x: number) => (x > 0.6 ? "높음" : x > 0.3 ? "보통" : "낮음");
   const signals = [
     {
@@ -277,8 +281,8 @@ export function report(userId: string, days = 7, now = Date.now()) {
     {
       key: "bond",
       label: "관계 유지 신호",
-      level: level(v.sample.activeDays / days),
-      desc: `${days}일 중 ${v.sample.activeDays}일 함께했어요`,
+      level: level(v.sample.activeDays / spanDays),
+      desc: `${spanDays}일 중 ${v.sample.activeDays}일 함께했어요`,
     },
   ];
 

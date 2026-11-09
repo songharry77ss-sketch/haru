@@ -1,122 +1,73 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { AnimatePresence, motion } from 'motion/react'
+import { useCallback, useState } from 'react'
+import { HelpSheet, Toasts } from './components/Overlay'
+import { HaruProvider, asset, useHaru } from './lib/store'
+import { Analysis } from './screens/Analysis'
+import { Chat } from './screens/Chat'
+import { Quests, RestMode } from './screens/Extras'
+import { Guardian } from './screens/Guardian'
+import { Home, type Overlay } from './screens/Home'
+import { Onboarding } from './screens/Onboarding'
+import { Play } from './screens/Play'
+import { Settings } from './screens/Settings'
+import { Shop, Wardrobe } from './screens/Wardrobe'
 
-function App() {
-  const [count, setCount] = useState(0)
+function Shell() {
+  const { state, booting } = useHaru()
+  const [overlay, setOverlay] = useState<Overlay>(null)
+  const [analysisTab, setAnalysisTab] = useState<'diary' | 'behavior' | 'report'>('diary')
+  const [firstVisit] = useState(() => sessionStorage.getItem('haru.first') === '1')
+  const close = useCallback(() => setOverlay(null), [])
 
+  if (booting)
+    return (
+      <div className="screen splash">
+        <motion.img src={asset('bunny_calm.webp')} alt="" animate={{ y: [0, -8, 0] }} transition={{ duration: 1.6, repeat: Infinity }} />
+        <span className="wordmark">haru</span>
+      </div>
+    )
+  if (!state) return <Onboarding />
+
+  const rest = state.usage.restMode
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      <Home
+        firstVisit={firstVisit}
+        open={(o) => {
+          if (o === 'analysis') setAnalysisTab('diary')
+          setOverlay(o)
+        }}
+      />
+      <AnimatePresence>
+        {overlay === 'chat' && !rest && <Chat key="chat" onClose={close} />}
+        {overlay === 'wardrobe' && <Wardrobe key="wardrobe" onClose={close} />}
+        {overlay === 'shop' && <Shop key="shop" onClose={close} />}
+        {overlay === 'analysis' && <Analysis key="analysis" onClose={close} initialTab={analysisTab} />}
+        {overlay === 'settings' && <Settings key="settings" onClose={close} />}
+        {overlay === 'play' && !rest && <Play key="play" onClose={close} />}
+      </AnimatePresence>
+      <Quests open={overlay === 'quests'} onClose={close} />
+      {rest && overlay !== 'analysis' && overlay !== 'settings' && (
+        <RestMode
+          onDiary={() => {
+            setAnalysisTab('diary')
+            setOverlay('analysis')
+          }}
+        />
+      )}
     </>
   )
 }
 
-export default App
+export default function App() {
+  const guardian = location.pathname.match(/^\/guardian\/([A-Za-z0-9-]+)/)
+  return (
+    <HaruProvider>
+      <main className="frame">
+        {guardian ? <Guardian code={guardian[1]} /> : <Shell />}
+        <Toasts />
+        <HelpSheet />
+      </main>
+    </HaruProvider>
+  )
+}

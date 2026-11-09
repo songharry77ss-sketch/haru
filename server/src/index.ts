@@ -40,7 +40,9 @@ if (fs.existsSync(WEB_DIST)) {
     express.static(WEB_DIST, {
       index: false,
       setHeaders(res, file) {
+        // Vite's hashed bundles never change; artwork under /img may be swapped, so it revalidates daily.
         if (file.includes(`${path.sep}assets${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        else if (file.includes(`${path.sep}img${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=86400");
       },
     }),
   );
