@@ -7,7 +7,6 @@ import type { Server } from "node:http";
 // suite through the production driver against any Postgres server.
 if (process.env.TEST_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
-  process.env.AUTO_MIGRATE = "1";
 } else {
   delete process.env.DATABASE_URL;
   process.env.DB_FILE = ":memory:";

@@ -160,11 +160,24 @@ async function connect(): Promise<Db> {
 
 let ready: Promise<Db> | null = null;
 
-/** The shared connection. The embedded database creates its tables on first use; real servers are migrated explicitly. */
+/**
+ * The shared connection. Tables are created automatically when they are missing, so a brand-new
+ * database (local or Supabase) needs no manual setup. The check is one cheap query per cold start.
+ */
 export function getDb(): Promise<Db> {
   ready ??= connect().then(async (db) => {
-    if (db.driver === "pglite" || process.env.AUTO_MIGRATE === "1") await db.exec(SCHEMA);
+    if (db.driver === "pglite" || process.env.AUTO_MIGRATE === "1") {
+      await db.exec(SCHEMA);
+    } else {
+      const [row] = await db.query<{ present: boolean }>("SELECT to_regclass('public.rewards') IS NOT NULL AS present");
+      // The advisory lock makes two servers starting at the same moment take turns creating the tables.
+      if (!row?.present) await db.exec(`SELECT pg_advisory_xact_lock(4127001);\n${SCHEMA}`);
+    }
     return db;
+  });
+  // A failed connection must not be cached, or the instance would keep failing after the database recovers.
+  ready.catch(() => {
+    ready = null;
   });
   return ready;
 }
