@@ -4,3 +4,8 @@ node_modules
 data
 *.db*
 .git
+web/android
+web/ios
+web/assets
+store
+.github
