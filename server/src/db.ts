@@ -1,7 +1,7 @@
 /**
  * Database access. One SQL dialect (PostgreSQL), two drivers:
  *
- *  - DATABASE_URL set  → postgres.js against a real server (Supabase in production)
+ *  - DATABASE_URL set  → postgres.js against a real server (Neon / Supabase / any Postgres in production)
  *  - otherwise         → PGlite, an embedded Postgres, so local development and tests need no setup
  *
  * Queries use `?` placeholders; they are rewritten to $1, $2, … before they reach the driver.
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS rewards (
 );
 
 -- Only the API server (table owner) may touch these tables. With row level security on and no policies,
--- Supabase's public REST endpoint (anon / authenticated roles) cannot read or write children's data.
+-- no other database role (for example a provider's public REST endpoint) can read or write children's data.
 ${TABLES.map((t) => `ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY;`).join("\n")}
 `;
 
@@ -112,14 +112,29 @@ const numbered = (sql: string) => {
   return sql.replace(/\?/g, () => `$${++i}`);
 };
 
+/** The connection string, wherever the host put it. Vercel's storage integrations may add their own prefix. */
+function databaseUrl(): string | undefined {
+  const direct = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (direct) return direct;
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value && /(^|_)(DATABASE|POSTGRES)_URL$/.test(key) && /^postgres(ql)?:\/\//.test(value)) return value;
+  }
+  return undefined;
+}
+
 async function connect(): Promise<Db> {
-  const url = process.env.DATABASE_URL;
-  if (url) {
+  const raw = databaseUrl();
+  if (raw) {
     const { default: postgres } = await import("postgres");
-    const host = new URL(url).hostname;
+    // Hosts append their own query parameters (sslmode, pgbouncer, …). The driver would forward unknown
+    // ones to the server as settings and the connection would be refused, so they are dropped; TLS is set below.
+    const parsed = new URL(raw);
+    parsed.search = "";
+    const url = parsed.toString();
+    const host = parsed.hostname;
     const local = host === "localhost" || host === "127.0.0.1";
     const sql = postgres(url, {
-      // Supabase's transaction pooler does not keep named prepared statements between queries.
+      // Connection poolers in transaction mode (Neon, Supabase) do not keep prepared statements between queries.
       prepare: false,
       // One connection per serverless instance; queries on it are pipelined.
       max: Number(process.env.DB_POOL_MAX ?? 1),

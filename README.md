@@ -26,7 +26,7 @@ server/   Express API (TypeScript) + PostgreSQL
   src/analysis.ts   행동 기반 정서 분석
   src/llm.ts        Claude 대화 + 오프라인 대화
   src/safety.ts     위험 감지 · 도움 기관 · 개인정보 가림
-  src/db.ts         DB 접속 (운영: Supabase Postgres / 개발: 내장 PGlite) + 스키마
+  src/db.ts         DB 접속 (운영: Postgres / 개발: 내장 PGlite) + 스키마
 web/      React + Vite 프론트엔드 (모바일 우선)
   android/, ios/    Capacitor 네이티브 앱 (kr.haru.companion)
 scripts/  build-vercel.mjs — Vercel 배포용 빌드
@@ -51,32 +51,20 @@ API는 :8787, 웹은 :5173 에서 열립니다. 테스트는 `npm test`.
 
 | 이름 | 설명 |
 | --- | --- |
-| `DATABASE_URL` | Postgres 주소. Supabase의 **Transaction pooler** 주소를 씁니다. 없으면 내장 DB |
+| `DATABASE_URL` | Postgres 주소(풀러 주소 권장). Vercel의 Neon 연동이 자동으로 넣어 줍니다. 없으면 내장 DB |
 | `ANTHROPIC_API_KEY` | 설정하면 Claude로 대화합니다. 없으면 간단한 대화 모드 |
 | `CLAUDE_MODEL` | 기본 `claude-opus-5-5` |
 | `AI_DAILY_LIMIT` | 사용자 1명당 하루 AI 답변 수 상한(기본 40). 넘으면 내장 답변으로 대화해 비용을 막습니다 |
 | `CORS_ORIGINS` | 추가로 허용할 웹 출처(쉼표 구분). 네이티브 앱 출처는 기본 허용 |
 
-## 배포 (Vercel + Supabase)
+## 배포 (Vercel)
 
-1. Supabase 프로젝트를 만들고 테이블을 생성합니다.
+1. [vercel.com/new](https://vercel.com/new)에서 이 저장소를 Import 합니다 (Project Name `haru-companion-kr`, Framework Preset `Other`). 빌드 설정은 `vercel.json`이 정합니다.
+2. 환경 변수 `ANTHROPIC_API_KEY`를 넣고 Deploy 합니다.
+3. 프로젝트의 **Storage → Create Database → Neon(Postgres)** 로 데이터베이스를 만들고 프로젝트에 연결합니다 (Region: Singapore). `DATABASE_URL`이 자동으로 들어갑니다.
+4. **Redeploy** 합니다. 테이블은 첫 실행 때 자동으로 만들어집니다.
 
-```bash
-DATABASE_URL="postgresql://…" npm run db:migrate
-```
-
-2. Vercel 프로젝트 환경 변수에 `DATABASE_URL`, `ANTHROPIC_API_KEY`를 넣습니다.
-3. 빌드해서 올립니다.
-
-```bash
-npm run build:vercel
-```
-
-```bash
-npx vercel deploy --prebuilt --prod
-```
-
-웹 파일은 Vercel CDN이, `/api/*`는 서울 리전(icn1)의 함수 하나가 처리합니다. 모든 테이블은 RLS가 켜져 있어 Supabase 공개 REST API로는 읽을 수 없고, API 서버만 접근합니다.
+이후에는 `main`에 push 할 때마다 자동 배포됩니다. 웹 파일은 Vercel CDN이, `/api/*`는 데이터베이스와 같은 지역(싱가포르 `sin1`)의 함수 하나가 처리합니다. 다른 지역의 Postgres를 쓰려면 환경 변수 `VERCEL_FUNCTION_REGION`을 바꾸세요. 모든 테이블은 RLS가 켜져 있어 API 서버(테이블 소유자)만 접근합니다.
 
 ## 앱 빌드
 

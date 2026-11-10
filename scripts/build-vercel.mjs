@@ -10,7 +10,9 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = path.join(root, ".vercel/output");
-const REGION = process.env.VERCEL_FUNCTION_REGION ?? "icn1"; // Seoul, next to the database
+// Run the API next to the database: every request makes several queries. Singapore is the nearest
+// region Vercel's built-in Postgres (Neon) offers to Korea.
+const REGION = process.env.VERCEL_FUNCTION_REGION ?? "sin1";
 
 fs.rmSync(out, { recursive: true, force: true });
 
