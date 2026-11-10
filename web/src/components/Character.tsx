@@ -1,22 +1,22 @@
 import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { Mood } from '../lib/api'
 import { asset } from '../lib/store'
 import { AccessoryLayer, type Pose, type Slot } from './Accessory'
 
-const POSE_IMG: Record<Mood, { img: string; pose: Pose }> = {
+const POSE_IMG: Record<Mood, { img: string; pose: Pose; blink?: string }> = {
   happy: { img: 'bunny_happy.webp', pose: 'hug' },
   excited: { img: 'bunny_happy.webp', pose: 'hug' },
-  calm: { img: 'bunny_calm.webp', pose: 'stand' },
-  sleepy: { img: 'bunny_calm.webp', pose: 'stand' },
-  worried: { img: 'bunny_worried.webp', pose: 'stand' },
-  hungry: { img: 'bunny_worried.webp', pose: 'stand' },
-  hurt: { img: 'bunny_worried.webp', pose: 'stand' },
+  calm: { img: 'bunny_calm.webp', pose: 'stand', blink: 'bunny_calm_blink.webp' },
+  sleepy: { img: 'bunny_calm_blink.webp', pose: 'stand' },
+  worried: { img: 'bunny_worried.webp', pose: 'stand', blink: 'bunny_worried_blink.webp' },
+  hungry: { img: 'bunny_worried.webp', pose: 'stand', blink: 'bunny_worried_blink.webp' },
+  hurt: { img: 'bunny_worried_blink.webp', pose: 'stand' },
 }
 
-// Warm the image cache so mood swaps never flash.
+// Warm the image cache so mood swaps and blinks never flash.
 if (typeof window !== 'undefined') {
-  for (const n of ['bunny_happy.webp', 'bunny_calm.webp', 'bunny_worried.webp']) {
+  for (const n of ['bunny_happy.webp', 'bunny_calm.webp', 'bunny_worried.webp', 'bunny_calm_blink.webp', 'bunny_worried_blink.webp']) {
     const i = new Image()
     i.src = asset(n)
   }
@@ -34,13 +34,15 @@ export interface CharacterHandle {
   bounce: () => void
   shake: () => void
   hearts: (n?: number) => void
+  /** Munching: a few quick squashes with crumbs. */
+  chomp: () => void
 }
 
 interface Particle {
   id: number
   x: number
   y: number
-  kind: 'heart' | 'spark' | 'sweat'
+  kind: 'heart' | 'spark' | 'sweat' | 'crumb'
 }
 
 interface Props {
@@ -56,7 +58,36 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
   const controls = useAnimationControls()
   const [particles, setParticles] = useState<Particle[]>([])
   const box = useRef<HTMLDivElement>(null)
-  const { img, pose } = POSE_IMG[mood]
+  const tilt = useRef<HTMLDivElement>(null)
+  const { img, pose, blink } = POSE_IMG[mood]
+  const [eyesShut, setEyesShut] = useState(false)
+
+  // Blink every few seconds, now and then twice in a row, like a living thing does.
+  useEffect(() => {
+    setEyesShut(false)
+    if (!blink) return
+    let alive = true
+    let timer = 0
+    const shut = (again: boolean) => {
+      if (!alive) return
+      setEyesShut(true)
+      timer = window.setTimeout(() => {
+        setEyesShut(false)
+        timer = window.setTimeout(() => (again ? shut(false) : wait()), again ? 150 : 0)
+      }, 130)
+    }
+    const wait = () => {
+      timer = window.setTimeout(() => shut(Math.random() < 0.22), 2400 + Math.random() * 3600)
+    }
+    wait()
+    return () => {
+      alive = false
+      window.clearTimeout(timer)
+    }
+  }, [blink])
+
+  /** Lean a little toward the stroking finger. */
+  const lean = (deg: number) => tilt.current?.style.setProperty('--lean', `${deg}deg`)
 
   // ----- touch gesture aggregation -----
   const g = useRef({
@@ -91,6 +122,14 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
     hearts: (n = 4) => {
       for (let i = 0; i < n; i++)
         window.setTimeout(() => spawn('heart', 35 + Math.random() * 30, 30 + Math.random() * 20), i * 110)
+    },
+    chomp: () => {
+      controls.start({
+        scaleY: [1, 0.95, 1.02, 0.95, 1.02, 0.96, 1],
+        scaleX: [1, 1.04, 0.99, 1.04, 0.99, 1.03, 1],
+        transition: { duration: 0.9, ease: 'easeInOut' },
+      })
+      for (let i = 0; i < 5; i++) window.setTimeout(() => spawn('crumb', 42 + Math.random() * 16, 56 + Math.random() * 5), 120 + i * 130)
     },
   }))
 
@@ -142,6 +181,10 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
     s.lx = e.clientX
     s.ly = e.clientY
     s.lt = now
+    if (box.current) {
+      const r = box.current.getBoundingClientRect()
+      lean(Math.max(-4, Math.min(4, ((e.clientX - (r.left + r.width / 2)) / r.width) * 9)))
+    }
     if (s.sinceHeart > 46 && d / dt < 1.6) {
       s.sinceHeart = 0
       const p = rel(e)
@@ -152,6 +195,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
     const s = g.current
     if (!s.down) return
     s.down = false
+    lean(0)
     const now = performance.now()
     if (s.moved > 28) {
       s.strokes++
@@ -173,7 +217,9 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
 
   return (
     <div className="char-box" ref={box}>
+      <div className={`char-shadow ${mood}`} aria-hidden />
       <motion.div className="char-motion" animate={controls} style={{ originY: 1 }}>
+        <div className="char-tilt" ref={tilt}>
         <div className={`char-idle ${mood}`}>
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.img
@@ -188,6 +234,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
               transition={{ duration: 0.22 }}
             />
           </AnimatePresence>
+          {blink && <img src={asset(blink)} alt="" className="char-img char-blink" draggable={false} style={{ opacity: eyesShut ? 1 : 0 }} />}
           <AccessoryLayer equipped={equipped} pose={pose} />
           {mood === 'sleepy' && <div className="zzz" aria-hidden>z z Z</div>}
           {mood === 'hungry' && (
@@ -197,6 +244,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
           )}
           {mood === 'hurt' && <div className="pain" aria-hidden />}
           {mood === 'excited' && <div className="sparkles" aria-hidden>✦ ✧ ✦</div>}
+        </div>
         </div>
       </motion.div>
       <div
@@ -227,7 +275,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
               animate={{ opacity: [0, 1, 1, 0], y: -70, scale: [0.4, 1.1, 1, 0.9], x: (Math.random() - 0.5) * 40 }}
               transition={{ duration: 1.1, ease: 'easeOut' }}
             >
-              {p.kind === 'heart' ? '♥' : p.kind === 'spark' ? '✦' : '💦'}
+              {p.kind === 'heart' ? '♥' : p.kind === 'spark' ? '✦' : p.kind === 'crumb' ? '•' : '💦'}
             </motion.span>
           ))}
         </AnimatePresence>

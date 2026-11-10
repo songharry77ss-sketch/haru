@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Stage } from '../components/Stage'
 import type { CharacterHandle, TouchSummary } from '../components/Character'
 import { Bolt, Carrot, Chart, Coin, Gear, Gem, Paw, Search, Send, Shirt, Store } from '../components/Icons'
@@ -22,6 +22,7 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState(firstVisit)
+  const [bite, setBite] = useState<{ id: number; img: string; x: number } | null>(null)
   const charRef = useRef<CharacterHandle>(null)
   if (!state) return null
   const { pet, user, quests } = state
@@ -42,16 +43,24 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
     }
   }
 
-  const feed = async (food: string) => {
+  const feed = async (index: number) => {
     if (busy) return
     setBusy(true)
+    const food = FOODS[index]
     try {
-      const r = apply(await api.feed(food))
-      say(r.line)
-      if (!r.refused) {
+      const r = apply(await api.feed(food.id))
+      if (r.refused) {
+        charRef.current?.shake()
+        say(r.line)
+      } else {
+        // The food flies to the pet's mouth, then it munches and answers.
+        setBite({ id: Date.now(), img: food.img, x: 5 + index * 25 })
         tap('medium')
-        charRef.current?.bounce()
-        charRef.current?.hearts(2)
+        window.setTimeout(() => {
+          charRef.current?.chomp()
+          say(r.line)
+          charRef.current?.hearts(2)
+        }, 430)
       }
       rewardToast(r.reward)
     } catch (e) {
@@ -71,6 +80,18 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
     <div className="screen home">
       <Stage ref={charRef} mood={pet.mood} equipped={pet.equipped} theme={pet.theme} onTouch={onTouch}>
         <AnimatePresence>
+          {bite && (
+            <motion.img
+              key={bite.id}
+              className="bite"
+              src={asset(bite.img)}
+              alt=""
+              initial={{ left: `${bite.x}%`, top: '104%', scale: 1, opacity: 1, rotate: -18 }}
+              animate={{ left: '41.5%', top: '55%', scale: 0.5, opacity: [1, 1, 1, 0], rotate: 8 }}
+              transition={{ duration: 0.48, ease: [0.25, 0.7, 0.35, 1] }}
+              onAnimationComplete={() => setBite(null)}
+            />
+          )}
           {hint && (
             <motion.div className="pat-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <img src={asset('hand.webp')} alt="" />
@@ -88,10 +109,10 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
           </button>
           <div className="wallet">
             <span className="pill" aria-label={`코인 ${user.coins}개`}>
-              <Coin /> {user.coins.toLocaleString()}
+              <Coin /> <Count value={user.coins} />
             </span>
             <span className="pill" aria-label={`보석 ${user.gems}개`}>
-              <Gem /> {user.gems}
+              <Gem /> <Count value={user.gems} />
             </span>
           </div>
           <button className="icon-btn" onClick={() => open('settings')} aria-label="설정">
@@ -129,8 +150,8 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
               exit={{ y: 16, opacity: 0 }}
               transition={{ duration: 0.18 }}
             >
-              {FOODS.map((f) => (
-                <button key={f.id} className="food" onClick={() => feed(f.id)} disabled={busy} aria-label={`${f.name} 주기${f.price ? ` (${f.price}코인)` : ''}`}>
+              {FOODS.map((f, i) => (
+                <button key={f.id} className="food" onClick={() => feed(i)} disabled={busy} aria-label={`${f.name} 주기${f.price ? ` (${f.price}코인)` : ''}`}>
                   <img src={asset(f.img)} alt="" />
                   {f.price > 0 && (
                     <span className="food-price">
@@ -179,6 +200,31 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
       </footer>
     </div>
   )
+}
+
+/** Numbers roll to their new value instead of jumping, so a reward is felt. */
+function Count({ value }: { value: number }) {
+  const [shown, setShown] = useState(value)
+  const from = useRef(value)
+  useEffect(() => {
+    const start = from.current
+    const delta = value - start
+    if (!delta) return
+    const t0 = performance.now()
+    let raf = 0
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / 450)
+      setShown(Math.round(start + delta * (1 - (1 - k) ** 3)))
+      if (k < 1) raf = requestAnimationFrame(step)
+      else from.current = value
+    }
+    raf = requestAnimationFrame(step)
+    return () => {
+      cancelAnimationFrame(raf)
+      from.current = value
+    }
+  }, [value])
+  return <>{shown.toLocaleString()}</>
 }
 
 export function Bar({ value, tone, big }: { value: number; tone: 'coral' | 'brown'; big?: boolean }) {

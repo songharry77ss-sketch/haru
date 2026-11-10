@@ -106,12 +106,18 @@
   inset: 0;
 }
 .char-motion,
+.char-tilt,
 .char-idle {
   position: absolute;
   inset: 0;
 }
+.char-tilt {
+  transform: rotate(var(--lean, 0deg));
+  transform-origin: 50% 96%;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
 .char-idle {
-  animation: breathe 3.4s ease-in-out infinite;
+  animation: breathe 3.6s ease-in-out infinite;
   transform-origin: 50% 100%;
 }
 .char-idle.happy,
@@ -119,24 +125,82 @@
   animation: hop 1.6s ease-in-out infinite;
 }
 .char-idle.sleepy {
-  animation: breathe 5s ease-in-out infinite;
-  filter: saturate(0.85) brightness(0.97);
+  animation: doze 5.2s ease-in-out infinite;
 }
+.char-idle.hungry,
+.char-idle.worried {
+  animation: droop 4.2s ease-in-out infinite;
+}
+/* Breathing with a slow side-to-side sway, so the pet never stands frozen. */
 @keyframes breathe {
+  0%,
+  100% {
+    transform: rotate(-0.7deg) scale(1, 1);
+  }
   50% {
-    transform: scale(1.012, 0.988);
+    transform: rotate(0.7deg) scale(1.012, 0.988);
+  }
+}
+@keyframes doze {
+  0%,
+  100% {
+    transform: rotate(-1.4deg) scale(1.005, 0.995);
+  }
+  50% {
+    transform: rotate(-2.6deg) scale(1.02, 0.975);
+  }
+}
+@keyframes droop {
+  0%,
+  100% {
+    transform: rotate(0.5deg) scale(1, 1);
+  }
+  50% {
+    transform: rotate(-0.5deg) scale(1.008, 0.985);
   }
 }
 @keyframes hop {
   0%,
   100% {
-    transform: translateY(0);
+    transform: translateY(0) scale(1, 1);
+  }
+  12% {
+    transform: translateY(0) scale(1.03, 0.96);
   }
   45% {
-    transform: translateY(-3.5%);
+    transform: translateY(-4.5%) scale(0.99, 1.02);
   }
-  60% {
-    transform: translateY(0) scale(1.02, 0.98);
+  62% {
+    transform: translateY(0) scale(1.03, 0.97);
+  }
+  75% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+/* Soft contact shadow that tightens while the pet is in the air. */
+.char-shadow {
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: -1.5%;
+  height: 6%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(92, 52, 28, 0.3), rgba(92, 52, 28, 0));
+  pointer-events: none;
+}
+.char-shadow.happy,
+.char-shadow.excited {
+  animation: shadow-hop 1.6s ease-in-out infinite;
+}
+@keyframes shadow-hop {
+  45% {
+    transform: scale(0.78);
+    opacity: 0.6;
+  }
+  62%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 .char-img {
@@ -188,6 +252,21 @@
 }
 .particle.spark {
   color: #ffd36b;
+}
+.particle.crumb {
+  color: #e8964a;
+  font-size: 16px;
+}
+.char-blink {
+  filter: none;
+  transition: none;
+}
+.bite {
+  position: absolute;
+  width: 15%;
+  z-index: 4;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 6px rgba(80, 40, 20, 0.25));
 }
 .zzz {
   position: absolute;
@@ -260,7 +339,7 @@
 .speech {
   position: absolute;
   left: 50%;
-  top: 10%;
+  top: 15%;
   translate: -50% -100%;
   max-width: 250px;
   width: max-content;
