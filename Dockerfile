@@ -18,4 +18,4 @@ COPY --from=build /app/server ./server
 COPY --from=build /app/web/dist ./web/dist
 VOLUME ["/data"]
 EXPOSE 8080
-CMD ["node", "--disable-warning=ExperimentalWarning", "server/dist/index.js"]
+CMD ["node", "server/dist/index.js"]

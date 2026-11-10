@@ -1,13 +1,13 @@
 name: iOS → App Store Connect
 
 # Builds the iPhone app on a GitHub-hosted Mac and uploads it to App Store Connect (TestFlight).
-# Needs repository secrets: APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY (contents of the .p8 file)
-# and the repository variable HARU_API_BASE (e.g. https://haru.onrender.com).
+# Needs repository secrets: APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY (contents of the .p8 file).
+# The server address the app talks to comes from web/.env.native.
 on:
   workflow_dispatch:
     inputs:
       api_base:
-        description: "API server URL (leave empty to use the HARU_API_BASE variable)"
+        description: "API server URL (leave empty to use web/.env.native)"
         required: false
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     env:
-      API_BASE: ${{ inputs.api_base || vars.HARU_API_BASE }}
+      API_BASE: ${{ inputs.api_base }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,15 +30,14 @@ jobs:
 
       - name: Check inputs
         run: |
-          test -n "$API_BASE" || { echo "::error::Set the HARU_API_BASE repository variable or the api_base input"; exit 1; }
           test -n "${{ secrets.ASC_PRIVATE_KEY }}" || { echo "::error::Missing App Store Connect API key secrets"; exit 1; }
           xcodebuild -version
 
       - name: Build web app
         run: |
           npm ci
-          VITE_API_BASE="$API_BASE" npm run build -w web
-          npx --prefix web cap sync ios
+          if [ -n "$API_BASE" ]; then export VITE_API_BASE="$API_BASE"; fi
+          npm run build:native -w web
 
       - name: App Store Connect key
         run: |

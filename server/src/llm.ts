@@ -6,7 +6,8 @@ import type { Mood } from "./pet.js";
 
 const MODEL = process.env.CLAUDE_MODEL ?? "claude-opus-5-5";
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-const client = hasKey ? new Anthropic({ timeout: 25_000, maxRetries: 1 }) : null;
+// A slow or failed call falls back to the built-in replies, so the child is never left waiting.
+const client = hasKey ? new Anthropic({ timeout: 20_000, maxRetries: 0 }) : null;
 
 export const llmEnabled = () => client !== null;
 

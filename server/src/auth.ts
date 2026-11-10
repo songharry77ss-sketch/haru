@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
-import { db } from "./db.js";
+import { one } from "./db.js";
 
 export interface User {
   id: string;
@@ -38,18 +38,21 @@ export function code(groups: number, size = 4): string {
   return out.join("-");
 }
 
-const byToken = db.prepare(
-  `SELECT id, nickname, age_group, character, pet_name, coins, gems, daily_limit_min,
-          recovery_code, guardian_code, created_at
-     FROM users WHERE token_hash = ?`,
-);
+const USER_COLUMNS = `id, nickname, age_group, character, pet_name, coins, gems, daily_limit_min,
+          recovery_code, guardian_code, created_at`;
 
-export function requireUser(req: Request, res: Response, next: NextFunction) {
-  const header = req.get("authorization") ?? "";
-  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (!token) return res.status(401).json({ error: "unauthorized" });
-  const user = byToken.get(sha256(token)) as User | undefined;
-  if (!user) return res.status(401).json({ error: "unauthorized" });
-  req.user = user;
-  next();
+export const userById = (id: string) => one<User>(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`, [id]);
+
+export async function requireUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const header = req.get("authorization") ?? "";
+    const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+    if (!token) return res.status(401).json({ error: "unauthorized" });
+    const user = await one<User>(`SELECT ${USER_COLUMNS} FROM users WHERE token_hash = ?`, [sha256(token)]);
+    if (!user) return res.status(401).json({ error: "unauthorized" });
+    req.user = user;
+    next();
+  } catch (err) {
+    next(err);
+  }
 }

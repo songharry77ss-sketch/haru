@@ -5,24 +5,41 @@
  * a distribution over four states: 불안(anxious) · 안정(stable) · 기쁨(joyful) · 무기력(lethargic).
  * Every weight is written out here so the result can be explained to a parent or teacher (XAI).
  */
-import { db } from "./db.js";
+import { query } from "./db.js";
 import { EMOTION_VALENCE, type Emotion } from "./safety.js";
-import { MEALS, dayKey, dayStart, isLateNight, lastNDays, local, mealFor } from "./time.js";
+import { MEALS, dayKey, dayStart, isLateNight, lastNDays, local } from "./time.js";
 
-type Ev = { type: string; data: Record<string, unknown>; created_at: number };
+export interface Ev {
+  type: string;
+  data: Record<string, unknown>;
+  created_at: number;
+}
 
-const eventsStmt = db.prepare(
-  "SELECT type, data, created_at FROM events WHERE user_id = ? AND created_at >= ? ORDER BY created_at",
-);
-const createdStmt = db.prepare("SELECT created_at FROM users WHERE id = ?");
-const usageStmt = db.prepare("SELECT day, seconds FROM usage WHERE user_id = ? AND day >= ?");
+/** Everything the analysis needs for one user and window, read once per request. */
+export interface Window {
+  days: number;
+  now: number;
+  createdAt: number;
+  events: Ev[];
+  usage: { day: string; seconds: number }[];
+}
 
-function loadEvents(userId: string, since: number): Ev[] {
-  return (eventsStmt.all(userId, since) as { type: string; data: string; created_at: number }[]).map((r) => ({
-    type: r.type,
-    data: JSON.parse(r.data) as Record<string, unknown>,
-    created_at: r.created_at,
-  }));
+export async function loadWindow(userId: string, createdAt: number, days = 7, now = Date.now()): Promise<Window> {
+  const since = dayStart(now, -(days - 1));
+  const [rows, usage] = await Promise.all([
+    query<{ type: string; data: string; created_at: number }>(
+      "SELECT type, data, created_at FROM events WHERE user_id = ? AND created_at >= ? ORDER BY created_at",
+      [userId, since],
+    ),
+    query<{ day: string; seconds: number }>("SELECT day, seconds FROM usage WHERE user_id = ? AND day >= ?", [userId, dayKey(since)]),
+  ]);
+  return {
+    days,
+    now,
+    createdAt,
+    usage,
+    events: rows.map((r) => ({ type: r.type, data: JSON.parse(r.data) as Record<string, unknown>, created_at: r.created_at })),
+  };
 }
 
 const WEEKDAY = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -36,15 +53,13 @@ const std = (xs: number[]) => {
 
 // ---------- routine (meal schedule) ----------
 
-export function routine(userId: string, days = 7, now = Date.now()) {
-  const created = (createdStmt.get(userId) as { created_at: number }).created_at;
-  const since = dayStart(now, -(days - 1));
-  const feeds = loadEvents(userId, since).filter((e) => e.type === "feed");
-  const dayKeys = lastNDays(now, days);
+export function routine(w: Window) {
+  const { days, now, createdAt } = w;
+  const feeds = w.events.filter((e) => e.type === "feed");
   const today = dayKey(now);
   const nowMins = local(now).hour * 60 + local(now).minute;
 
-  const byDay = dayKeys.map((day) => {
+  const byDay = lastNDays(now, days).map((day) => {
     const dayFeeds = feeds.filter((f) => dayKey(f.created_at) === day);
     let onTime = 0;
     let late = 0;
@@ -60,10 +75,9 @@ export function routine(userId: string, days = 7, now = Date.now()) {
       // Only count a meal as missed once its window has closed and the account existed then.
       const slotEnd = dayStart(Date.parse(`${day}T12:00:00Z`)) + (m.hour * 60 + 180) * 60_000;
       const windowClosed = day < today || (day === today && nowMins > m.hour * 60 + 180);
-      if (windowClosed && slotEnd > created) missed++;
+      if (windowClosed && slotEnd > createdAt) missed++;
     }
-    const wd = WEEKDAY[new Date(`${day}T12:00:00Z`).getUTCDay()];
-    return { day, weekday: wd, onTime, late, missed };
+    return { day, weekday: WEEKDAY[new Date(`${day}T12:00:00Z`).getUTCDay()], onTime, late, missed };
   });
 
   const onTime = byDay.reduce((a, d) => a + d.onTime, 0);
@@ -83,9 +97,8 @@ export function routine(userId: string, days = 7, now = Date.now()) {
 
 // ---------- the six variables ----------
 
-export function variables(userId: string, days = 7, now = Date.now()) {
-  const since = dayStart(now, -(days - 1));
-  const ev = loadEvents(userId, since);
+function variables(w: Window) {
+  const ev = w.events;
   const touches = ev.filter((e) => e.type === "touch");
   const chats = ev.filter((e) => e.type === "chat");
   const diaries = ev.filter((e) => e.type === "diary");
@@ -101,10 +114,9 @@ export function variables(userId: string, days = 7, now = Date.now()) {
     ...diaries.map((d) => ({ emotion: d.data.mood as Emotion, w: 1, at: d.created_at })),
   ].filter((e) => e.emotion in EMOTION_VALENCE);
   const valences = emotions.map((e) => EMOTION_VALENCE[e.emotion] * (0.5 + e.w / 2));
-  const share = (set: Emotion[]) =>
-    emotions.length ? emotions.filter((e) => set.includes(e.emotion)).length / emotions.length : 0;
+  const share = (set: Emotion[]) => (emotions.length ? emotions.filter((e) => set.includes(e.emotion)).length / emotions.length : 0);
 
-  const r = routine(userId, days, now);
+  const r = routine(w);
 
   return {
     sample: { touches: touches.length, chats: chats.length, diaries: diaries.length, plays: plays.length, activeDays },
@@ -126,21 +138,21 @@ export function variables(userId: string, days = 7, now = Date.now()) {
   };
 }
 
+/** A "recovery" is gentle touching within 3 minutes after a rough burst. */
+function recoveries(v: ReturnType<typeof variables>) {
+  return v.rough.filter((r) =>
+    v.touches.some((t) => t.data.rough !== true && t.created_at > r.created_at && t.created_at - r.created_at < 180_000),
+  ).length;
+}
+
 // ---------- behaviour dashboard ----------
 
-export function behavior(userId: string, days = 7, now = Date.now()) {
-  const since = dayStart(now, -(days - 1));
-  const ev = loadEvents(userId, since);
-  const v = variables(userId, days, now);
+export function behavior(w: Window) {
+  const ev = w.events;
+  const v = variables(w);
   const count = (t: string) => ev.filter((e) => e.type === t).length;
 
-  const raw = {
-    touch: count("touch"),
-    feed: count("feed"),
-    play: count("play"),
-    dress: count("dress"),
-    chat: count("chat"),
-  };
+  const raw = { touch: count("touch"), feed: count("feed"), play: count("play"), dress: count("dress"), chat: count("chat") };
   const total = Object.values(raw).reduce((a, b) => a + b, 0) || 1;
   // Recommended mix from the clinical model: care and conversation lead, decoration stays light.
   const recommended = { touch: 0.25, feed: 0.2, play: 0.2, dress: 0.1, chat: 0.25 };
@@ -156,17 +168,11 @@ export function behavior(userId: string, days = 7, now = Date.now()) {
         ? `${AXIS_LABEL[gaps[0].k]}의 비중을 조금 더 늘려보는 건 어떨까요?`
         : "상호작용이 고르게 잘 이루어지고 있어요.";
 
-  // Rough-touch episodes: bursts of hard/fast taps. A "recovery" is gentle touching within 3 minutes after.
-  const recovered = v.rough.filter((r) =>
-    v.touches.some((t) => t.data.rough !== true && t.created_at > r.created_at && t.created_at - r.created_at < 180_000),
-  ).length;
   const peak = Math.max(0, ...v.touches.map((t) => Number(t.data.peakRate ?? 0)));
-
-  const usageRows = usageStmt.all(userId, dayKey(since)) as { day: string; seconds: number }[];
   const sessions = ev.filter((e) => e.type === "session");
 
   return {
-    days,
+    days: w.days,
     routine: v.routineDetail,
     balance: {
       axes: (Object.keys(AXIS_LABEL) as (keyof typeof AXIS_LABEL)[]).map((k) => ({
@@ -181,14 +187,14 @@ export function behavior(userId: string, days = 7, now = Date.now()) {
     roughTouch: {
       rate: round(v.roughRatio * 100),
       peakPerSec: round(peak, 1),
-      recovery: v.rough.length ? round((recovered / v.rough.length) * 100) : null,
+      recovery: v.rough.length ? round((recoveries(v) / v.rough.length) * 100) : null,
       episodes: v.rough.length,
       suggestRest: v.roughRatio > 0.3,
     },
     access: {
       sessions: sessions.length,
       lateNight: sessions.filter((s) => isLateNight(s.created_at)).length,
-      avgMinutesPerDay: round(mean(usageRows.map((u) => u.seconds / 60))),
+      avgMinutesPerDay: round(mean(w.usage.map((u) => u.seconds / 60))),
     },
   };
 }
@@ -196,15 +202,11 @@ export function behavior(userId: string, days = 7, now = Date.now()) {
 // ---------- 마음 리포트 ----------
 
 export type StateKey = "stable" | "anxious" | "joyful" | "lethargic";
-export const STATE_LABEL: Record<StateKey, string> = {
-  stable: "안정",
-  anxious: "불안",
-  joyful: "기쁨",
-  lethargic: "무기력",
-};
+export const STATE_LABEL: Record<StateKey, string> = { stable: "안정", anxious: "불안", joyful: "기쁨", lethargic: "무기력" };
 
-export function report(userId: string, days = 7, now = Date.now()) {
-  const v = variables(userId, days, now);
+export function report(w: Window) {
+  const { days, now } = w;
+  const v = variables(w);
   const n = v.sample.touches + v.sample.chats + v.sample.diaries + v.sample.plays;
 
   const scores: Record<StateKey, number> = {
@@ -215,13 +217,10 @@ export function report(userId: string, days = 7, now = Date.now()) {
     stable: 1.3 * v.routineAdherence + 0.6 * (1 - v.volatility) + 0.5 * v.gentleShare + 0.3 * (1 - v.lateNightRatio),
   };
   // Little data → softer distribution, so a brand-new account never reads as "99% 안정".
-  const n0 = v.sample.touches + v.sample.chats + v.sample.diaries + v.sample.plays;
-  const T = n0 >= 40 ? 0.35 : n0 >= 12 ? 0.55 : 0.9;
+  const T = n >= 40 ? 0.35 : n >= 12 ? 0.55 : 0.9;
   const exps = Object.fromEntries(Object.entries(scores).map(([k, s]) => [k, Math.exp(s / T)])) as Record<StateKey, number>;
   const z = Object.values(exps).reduce((a, b) => a + b, 0);
-  const dist = Object.fromEntries(
-    Object.entries(exps).map(([k, e]) => [k, Math.round((e / z) * 100)]),
-  ) as Record<StateKey, number>;
+  const dist = Object.fromEntries(Object.entries(exps).map(([k, e]) => [k, Math.round((e / z) * 100)])) as Record<StateKey, number>;
   const top = (Object.keys(dist) as StateKey[]).sort((a, b) => dist[b] - dist[a])[0];
 
   const r = v.routineDetail;
@@ -233,16 +232,11 @@ export function report(userId: string, days = 7, now = Date.now()) {
   const negDays = new Set(v.emotions.filter((e) => EMOTION_VALENCE[e.emotion] < 0).map((e) => dayKey(e.at)));
   const roughOnNeg = v.touches.filter((t) => negDays.has(dayKey(t.created_at)));
   const roughRateNeg = roughOnNeg.length ? roughOnNeg.filter((t) => t.data.rough === true).length / roughOnNeg.length : 0;
-  const recovered = v.rough.filter((x) =>
-    v.touches.some((t) => t.data.rough !== true && t.created_at > x.created_at && t.created_at - x.created_at < 180_000),
-  ).length;
-  const recoveryRate = v.rough.length ? recovered / v.rough.length : null;
+  const recoveryRate = v.rough.length ? recoveries(v) / v.rough.length : null;
 
   const evidence: string[] = [];
   if (r.onTimeRate !== null)
-    evidence.push(
-      `밥 시간 정시율 ${Math.round(r.onTimeRate * 100)}%로 루틴이 ${r.onTimeRate >= 0.7 ? "대체로 유지됐어요" : "조금 흔들렸어요"}.`,
-    );
+    evidence.push(`밥 시간 정시율 ${Math.round(r.onTimeRate * 100)}%로 루틴이 ${r.onTimeRate >= 0.7 ? "대체로 유지됐어요" : "조금 흔들렸어요"}.`);
   if (v.sample.touches >= 5)
     evidence.push(
       v.roughRatio > 0.25
@@ -262,8 +256,7 @@ export function report(userId: string, days = 7, now = Date.now()) {
   if (v.lateNightRatio > 0.3) evidence.push("늦은 밤 접속이 잦았어요. 잠이 부족하지 않은지 살펴봐 주세요.");
   if (!evidence.length) evidence.push("하루와 함께한 시간이 쌓이면 더 정확한 리포트를 보여줄게요.");
 
-  const created = (createdStmt.get(userId) as { created_at: number }).created_at;
-  const spanDays = Math.max(1, Math.min(days, Math.ceil((now - dayStart(created)) / 86_400_000)));
+  const spanDays = Math.max(1, Math.min(days, Math.ceil((now - dayStart(w.createdAt)) / 86_400_000)));
   const level = (x: number) => (x > 0.6 ? "높음" : x > 0.3 ? "보통" : "낮음");
   const signals = [
     {
@@ -312,5 +305,3 @@ export function report(userId: string, days = 7, now = Date.now()) {
     ],
   };
 }
-
-export { mealFor };

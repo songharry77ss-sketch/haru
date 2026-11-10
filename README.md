@@ -21,47 +21,72 @@
 ## 구조
 
 ```
-server/   Express + node:sqlite API (TypeScript)
+server/   Express API (TypeScript) + PostgreSQL
   src/api.ts        라우트
   src/analysis.ts   행동 기반 정서 분석
   src/llm.ts        Claude 대화 + 오프라인 대화
   src/safety.ts     위험 감지 · 도움 기관 · 개인정보 가림
+  src/db.ts         DB 접속 (운영: Supabase Postgres / 개발: 내장 PGlite) + 스키마
 web/      React + Vite 프론트엔드 (모바일 우선)
+  android/, ios/    Capacitor 네이티브 앱 (kr.haru.companion)
+scripts/  build-vercel.mjs — Vercel 배포용 빌드
+store/    스토어 스크린샷 · 등록 문구 (STORE.md)
 ```
 
 ## 로컬 실행
 
-Node 22.13 이상이 필요합니다.
+Node 22.13 이상이 필요합니다. 데이터베이스 설치는 필요 없습니다(내장 Postgres가 `./data`에 만들어집니다).
 
 ```bash
 npm install
-npm run dev          # API :8787 + 웹 :5173
 ```
-
-프로덕션 빌드:
 
 ```bash
-npm run build
-npm start            # :8787 에서 API와 웹을 함께 제공
+npm run dev
 ```
+
+API는 :8787, 웹은 :5173 에서 열립니다. 테스트는 `npm test`.
 
 ## 환경 변수
 
 | 이름 | 설명 |
 | --- | --- |
+| `DATABASE_URL` | Postgres 주소. Supabase의 **Transaction pooler** 주소를 씁니다. 없으면 내장 DB |
 | `ANTHROPIC_API_KEY` | 설정하면 Claude로 대화합니다. 없으면 간단한 대화 모드 |
 | `CLAUDE_MODEL` | 기본 `claude-opus-5-5` |
-| `PORT` | 기본 8787 (Docker는 8080) |
-| `DATA_DIR` / `DB_FILE` | SQLite 저장 위치 (기본 `./data/haru.db`) |
+| `CORS_ORIGINS` | 추가로 허용할 웹 출처(쉼표 구분). 네이티브 앱 출처는 기본 허용 |
 
-## 배포
+## 배포 (Vercel + Supabase)
 
-`Dockerfile`과 Render 블루프린트(`render.yaml`)가 들어 있습니다.
+1. Supabase 프로젝트를 만들고 테이블을 생성합니다.
 
-1. Render → **New + → Blueprint** → 이 저장소 선택
-2. `ANTHROPIC_API_KEY` 입력 → Apply
+```bash
+DATABASE_URL="postgresql://…" npm run db:migrate
+```
 
-SQLite 데이터는 `/data` 디스크에 저장되므로 디스크가 붙는 서비스(Render, Fly.io, Railway 볼륨 등)에 배포하세요.
+2. Vercel 프로젝트 환경 변수에 `DATABASE_URL`, `ANTHROPIC_API_KEY`를 넣습니다.
+3. 빌드해서 올립니다.
+
+```bash
+npm run build:vercel
+```
+
+```bash
+npx vercel deploy --prebuilt --prod
+```
+
+웹 파일은 Vercel CDN이, `/api/*`는 서울 리전(icn1)의 함수 하나가 처리합니다. 모든 테이블은 RLS가 켜져 있어 Supabase 공개 REST API로는 읽을 수 없고, API 서버만 접근합니다.
+
+## 앱 빌드
+
+앱이 접속할 서버 주소는 `web/.env.native`에 있습니다.
+
+```bash
+npm run native:sync
+```
+
+- Android: `web/android`에서 `./gradlew bundleRelease` (서명 정보는 `HARU_KEYSTORE_PROPERTIES` 환경 변수로 지정한 파일에서 읽음)
+- iOS: GitHub Actions의 **iOS → App Store Connect** 워크플로를 실행 (Mac 불필요)
 
 ## 안내
 
