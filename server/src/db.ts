@@ -142,6 +142,8 @@ async function connect(): Promise<Db> {
     };
   }
 
+  // The embedded database is a development convenience; a deployment without DATABASE_URL is a misconfiguration.
+  if (process.env.VERCEL) throw new Error("DATABASE_URL is not set on this deployment");
   const { PGlite, types } = await import("@electric-sql/pglite");
   const memory = process.env.DB_FILE === ":memory:";
   const dir = path.join(process.env.DATA_DIR ?? path.resolve(process.cwd(), "data"), "pg");

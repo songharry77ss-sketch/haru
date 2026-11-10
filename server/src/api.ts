@@ -1,7 +1,7 @@
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from "express";
 import crypto from "node:crypto";
 import { z } from "zod";
-import { one, query } from "./db.js";
+import { getDb, one, query } from "./db.js";
 import { code, newToken, requireUser, sha256, userById, type User } from "./auth.js";
 import { CHARACTERS, FOODS, ITEMS, STARTER_ITEMS, itemById, relationship, type FoodId } from "./catalog.js";
 import { dailyQuests, grant, loadPet, logEvent, petView, react, savePet, type Mood, type PetRow } from "./pet.js";
@@ -69,13 +69,16 @@ async function state(userId: string, now = Date.now(), pet?: PetRow) {
 
 // ---------- public ----------
 
-api.get(
-  "/health",
-  h(async (_req, res) => {
-    await query("SELECT 1");
-    res.json({ ok: true, ai: llmEnabled() ? "model" : "offline" });
-  }),
-);
+api.get("/health", async (_req, res) => {
+  try {
+    const db = await getDb();
+    await db.query("SELECT 1");
+    res.json({ ok: true, db: db.driver, ai: llmEnabled() ? "model" : "offline" });
+  } catch (err) {
+    console.error("[health]", (err as Error).message);
+    res.status(503).json({ ok: false, error: "database_unavailable" });
+  }
+});
 
 api.get("/catalog", (_req, res) => {
   res.setHeader("Cache-Control", "public, max-age=300");
