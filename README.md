@@ -54,6 +54,7 @@ API는 :8787, 웹은 :5173 에서 열립니다. 테스트는 `npm test`.
 | `DATABASE_URL` | Postgres 주소. Supabase의 **Transaction pooler** 주소를 씁니다. 없으면 내장 DB |
 | `ANTHROPIC_API_KEY` | 설정하면 Claude로 대화합니다. 없으면 간단한 대화 모드 |
 | `CLAUDE_MODEL` | 기본 `claude-opus-5-5` |
+| `AI_DAILY_LIMIT` | 사용자 1명당 하루 AI 답변 수 상한(기본 40). 넘으면 내장 답변으로 대화해 비용을 막습니다 |
 | `CORS_ORIGINS` | 추가로 허용할 웹 출처(쉼표 구분). 네이티브 앱 출처는 기본 허용 |
 
 ## 배포 (Vercel + Supabase)

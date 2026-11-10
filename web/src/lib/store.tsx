@@ -118,10 +118,10 @@ export function HaruProvider({ children }: { children: ReactNode }) {
     const id = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
       api
-        .heartbeat(30)
+        .heartbeat(60)
         .then((usage) => setState((s) => (s ? { ...s, usage } : s)))
         .catch(() => undefined)
-    }, 30_000)
+    }, 60_000)
     return () => window.clearInterval(id)
   }, [state === null]) // eslint-disable-line react-hooks/exhaustive-deps
 

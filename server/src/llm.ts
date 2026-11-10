@@ -90,8 +90,9 @@ export async function companionReply(
   ctx: CompanionContext,
   history: { role: "user" | "assistant"; content: string }[],
   text: string,
+  opts: { allowModel?: boolean } = {},
 ): Promise<CompanionReply> {
-  if (client) {
+  if (client && opts.allowModel !== false) {
     try {
       const res = await client.beta.messages.create({
         model: MODEL,
@@ -100,7 +101,7 @@ export async function companionReply(
         fallbacks: "default",
         system: [{ type: "text", text: systemPrompt(ctx) }],
         output_config: { effort: "low", format: { type: "json_schema", schema: JSON_SCHEMA } },
-        messages: [...history.slice(-12), { role: "user", content: text }],
+        messages: [...history.slice(-8), { role: "user", content: text }],
       });
       if (res.stop_reason !== "refusal") {
         const body = res.content.find((b) => b.type === "text");

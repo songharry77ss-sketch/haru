@@ -8,7 +8,9 @@ import { dailyQuests, grant, loadPet, logEvent, petView, react, savePet, type Mo
 import { behavior, loadWindow, report, routine } from "./analysis.js";
 import { companionReply, llmEnabled } from "./llm.js";
 import { EMOTION_LABEL, HELPLINES, assessRisk, crisisReply, redactPII, type Emotion } from "./safety.js";
-import { dayKey, isLateNight, local, mealFor } from "./time.js";
+import { dayKey, dayStart, isLateNight, local, mealFor } from "./time.js";
+
+const AI_DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT ?? 40);
 
 export const api = express.Router();
 
@@ -408,11 +410,14 @@ api.post(
     const user = req.user!;
     const now = Date.now();
     if (await resting(user, res)) return;
-    const recent = await one<{ n: number }>(
-      "SELECT count(*) AS n FROM events WHERE user_id = ? AND type = 'chat' AND created_at > ?",
-      [user.id, now - 60_000],
+    const counts = await one<{ recent: number; today: number }>(
+      `SELECT count(*) FILTER (WHERE created_at > ?) AS recent, count(*) AS today
+         FROM events WHERE user_id = ? AND type = 'chat' AND created_at >= ?`,
+      [now - 60_000, user.id, dayStart(now)],
     );
-    if ((recent?.n ?? 0) >= 12) return res.status(429).json({ error: "slow_down", message: "조금만 천천히 이야기해 줘!" });
+    if ((counts?.recent ?? 0) >= 12) return res.status(429).json({ error: "slow_down", message: "조금만 천천히 이야기해 줘!" });
+    // Cost ceiling: after this many AI replies in a day the pet keeps talking with its built-in replies.
+    const allowModel = (counts?.today ?? 0) < AI_DAILY_LIMIT;
 
     const text = redactPII(body.text);
     const pet = await loadPet(user.id, now);
@@ -434,7 +439,7 @@ api.post(
     } else {
       const [history, diary] = await Promise.all([
         query<{ role: "user" | "assistant"; content: string }>(
-          "SELECT role, content FROM messages WHERE user_id = ? AND content <> '[일기]' ORDER BY id DESC LIMIT 12",
+          "SELECT role, content FROM messages WHERE user_id = ? AND content <> '[일기]' ORDER BY id DESC LIMIT 8",
           [user.id],
         ),
         one<{ content: string }>("SELECT content FROM diary WHERE user_id = ? ORDER BY id DESC LIMIT 1", [user.id]),
@@ -455,6 +460,7 @@ api.post(
         },
         history.reverse(),
         text,
+        { allowModel },
       );
       reply = out.reply;
       petMood = out.petMood;
