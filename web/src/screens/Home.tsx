@@ -4,7 +4,8 @@ import { Stage } from '../components/Stage'
 import type { CharacterHandle, TouchSummary } from '../components/Character'
 import { Bolt, Carrot, Chart, Coin, Gear, Gem, Paw, Search, Send, Shirt, Store } from '../components/Icons'
 import { api } from '../lib/api'
-import { greeting, moment } from '../lib/expressions'
+import { greeting } from '../lib/expressions'
+import { greetingPose } from '../lib/poses'
 import { tap } from '../lib/native'
 import { asset, useHaru } from '../lib/store'
 
@@ -36,7 +37,11 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
       /* private mode */
     }
     const away = last ? (Date.now() - last) / 3_600_000 : 0
-    const t = window.setTimeout(() => charRef.current?.express(greeting(new Date().getHours(), away), 2600), 500)
+    const hour = new Date().getHours()
+    const t = window.setTimeout(() => {
+      if (Math.random() < 0.7) charRef.current?.pose(greetingPose(hour, away), 2800)
+      else charRef.current?.express(greeting(hour, away), 2600)
+    }, 500)
     return () => window.clearTimeout(t)
   }, [])
 
@@ -49,7 +54,7 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
     try {
       const r = apply(await api.touch(s))
       say(r.line)
-      if (r.rough) charRef.current?.express(moment('rough'), 2200)
+      if (r.rough) charRef.current?.react('rough', 2200)
       else {
         charRef.current?.hearts(3)
         tap()
@@ -68,18 +73,18 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
       const r = apply(await api.feed(food.id))
       if (r.refused) {
         charRef.current?.shake()
-        charRef.current?.express(moment('refused'), 2200)
+        charRef.current?.react('refused', 2200)
         say(r.line)
       } else {
         // The food flies to the pet's mouth, then it munches and answers.
         setBite({ id: Date.now(), img: food.img, x: 5 + index * 25 })
         tap('medium')
         window.setTimeout(() => {
-          charRef.current?.chomp()
+          charRef.current?.chomp(food.id)
           say(r.line)
           charRef.current?.hearts(2)
         }, 430)
-        window.setTimeout(() => charRef.current?.express(moment('fed'), 2400), 1750)
+        window.setTimeout(() => charRef.current?.react('fed', 2400), 1750)
       }
       rewardToast(r.reward)
     } catch (e) {

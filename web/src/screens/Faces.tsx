@@ -3,31 +3,41 @@ import { Character } from '../components/Character'
 import { Face, RIGS } from '../components/Face'
 import { Sheet } from '../components/Overlay'
 import { LOOK_IDS, LOOKS, type LookId } from '../lib/expressions'
+import { POSE_IDS, POSES, poseSrc, type PoseId } from '../lib/poses'
 import { asset, useHaru } from '../lib/store'
 
 /** Every face the pet can make, to browse and try on. */
 export function Faces({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state } = useHaru()
   const [picked, setPicked] = useState<LookId>('happy_open')
+  const [pose, setPose] = useState<PoseId | null>(null)
   if (!state) return null
   return (
     <Sheet open={open} onClose={onClose} label="표정 도감">
       <div className="faces">
         <h2>
-          {state.user.petName}의 표정 <b>{LOOK_IDS.length}</b>가지
+          {state.user.petName}의 표정 <b>{LOOK_IDS.length}</b>가지 · 포즈 <b>{POSE_IDS.length}</b>가지
         </h2>
         <div className="faces-stage">
           <div className="faces-pet">
-            <Character mood="calm" equipped={state.pet.equipped} interactive={false} look={picked} />
+            <Character mood="calm" equipped={state.pet.equipped} interactive={false} look={picked} heldPose={pose ?? undefined} />
           </div>
-          <p className="faces-name">{LOOKS[picked].label}</p>
+          <p className="faces-name">{pose ? POSES[pose] : LOOKS[picked].label}</p>
         </div>
         <div className="faces-grid">
           {LOOK_IDS.map((id) => {
             const look = LOOKS[id]
             const rig = 'rig' in look && look.rig ? look.rig : 'stand'
             return (
-              <button key={id} className={`face-tile ${picked === id ? 'on' : ''}`} onClick={() => setPicked(id)} aria-pressed={picked === id}>
+              <button
+                key={id}
+                className={`face-tile ${!pose && picked === id ? 'on' : ''}`}
+                onClick={() => {
+                  setPose(null)
+                  setPicked(id)
+                }}
+                aria-pressed={!pose && picked === id}
+              >
                 <span className="face-mini">
                   <span className="face-mini-box">
                     <img src={asset(RIGS[rig].img)} alt="" className="char-img" draggable={false} />
@@ -38,6 +48,14 @@ export function Faces({ open, onClose }: { open: boolean; onClose: () => void })
               </button>
             )
           })}
+          {POSE_IDS.map((id) => (
+            <button key={id} className={`face-tile ${pose === id ? 'on' : ''}`} onClick={() => setPose(id)} aria-pressed={pose === id}>
+              <span className="face-mini pose-mini">
+                <img src={asset(poseSrc(id))} alt="" loading="lazy" draggable={false} />
+              </span>
+              <span className="face-label">{POSES[id]}</span>
+            </button>
+          ))}
         </div>
       </div>
     </Sheet>

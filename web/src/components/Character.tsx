@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { Mood } from '../lib/api'
 import { IDLE, LOOKS, moment, pick, type Look, type LookId } from '../lib/expressions'
+import { idlePose, loadPose, poseFor, poseSrc, type PoseId, type PoseMoment } from '../lib/poses'
 import { asset } from '../lib/store'
 import { AccessoryLayer, type Slot } from './Accessory'
 import { Face, RIGS } from './Face'
@@ -26,10 +27,14 @@ export interface CharacterHandle {
   bounce: () => void
   shake: () => void
   hearts: (n?: number) => void
-  /** Munching: a few quick squashes with crumbs. */
-  chomp: () => void
+  /** Munching: a few quick squashes with crumbs. Pass the food to see the pet holding it. */
+  chomp: (food?: string) => void
   /** Make a face for a moment, then go back to the resting one. */
   express: (look: LookId, ms?: number) => void
+  /** Strike a whole-body pose for a moment. */
+  pose: (pose: PoseId, ms?: number) => void
+  /** React to something with either a pose or a face, so the same event never looks the same twice. */
+  react: (m: PoseMoment, ms?: number) => void
 }
 
 interface Particle {
@@ -50,13 +55,15 @@ interface Props {
   talking?: boolean
   /** No little idle faces of its own. */
   quiet?: boolean
+  /** Hold this whole-body pose (previews). */
+  heldPose?: PoseId
 }
 
 let pid = 0
 const clamp = (v: number) => Math.max(-1, Math.min(1, v))
 
 export const Character = forwardRef<CharacterHandle, Props>(function Character(
-  { mood, equipped, onTouch, interactive = true, look: held, talking, quiet },
+  { mood, equipped, onTouch, interactive = true, look: held, talking, quiet, heldPose },
   ref,
 ) {
   const controls = useAnimationControls()
@@ -70,11 +77,14 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
   const [stroking, setStroking] = useState<LookId | null>(null)
   const [idle, setIdle] = useState<LookId | null>(null)
   const [gaze, setGaze] = useState<[number, number] | null>(null)
+  const [posing, setPosing] = useState<PoseId | null>(null)
   const reactionTimer = useRef(0)
+  const poseTimer = useRef(0)
+  const poseTurn = useRef(0)
   const busy = useRef(false)
   useEffect(() => {
-    busy.current = Boolean(reaction || stroking || held)
-  }, [reaction, stroking, held])
+    busy.current = Boolean(reaction || stroking || held || posing)
+  }, [reaction, stroking, held, posing])
 
   const id: LookId = held ?? stroking ?? reaction ?? idle ?? IDLE[mood][0]
   const look: Look = LOOKS[id]
@@ -85,7 +95,38 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
     setReaction(next)
     reactionTimer.current = window.setTimeout(() => setReaction(null), ms)
   }, [])
-  useEffect(() => () => window.clearTimeout(reactionTimer.current), [])
+  const strike = useCallback((next: PoseId, ms = 2400) => {
+    const turn = ++poseTurn.current
+    // Shown only once the picture has arrived, and only if nothing newer was asked for meanwhile.
+    void loadPose(next).then(() => {
+      if (turn !== poseTurn.current) return
+      window.clearTimeout(poseTimer.current)
+      setPosing(next)
+      poseTimer.current = window.setTimeout(() => setPosing(null), ms)
+    })
+  }, [])
+  const dropPose = useCallback(() => {
+    poseTurn.current++
+    window.clearTimeout(poseTimer.current)
+    setPosing(null)
+  }, [])
+  const react = useCallback(
+    (m: PoseMoment, ms = 2200) => {
+      if (Math.random() < 0.55) strike(poseFor(m), ms)
+      else {
+        dropPose()
+        express(moment(m), ms)
+      }
+    },
+    [strike, dropPose, express],
+  )
+  useEffect(
+    () => () => {
+      window.clearTimeout(reactionTimer.current)
+      window.clearTimeout(poseTimer.current)
+    },
+    [],
+  )
 
   // Left alone, the pet glances around, hums, blinks slowly: small signs of life between interactions.
   useEffect(() => {
@@ -101,8 +142,12 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
         () => {
           if (!alive) return
           if (!busy.current && document.visibilityState === 'visible') {
-            setIdle(pick(`idle-${mood}`, extras))
-            show = window.setTimeout(() => alive && setIdle(null), 1500 + Math.random() * 1400)
+            // Sometimes a small change of face, sometimes it gets up to something.
+            if (Math.random() < 0.45) strike(idlePose(mood), 2800 + Math.random() * 1400)
+            else {
+              setIdle(pick(`idle-${mood}`, extras))
+              show = window.setTimeout(() => alive && setIdle(null), 1500 + Math.random() * 1400)
+            }
           }
           loop()
         },
@@ -115,7 +160,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
       window.clearTimeout(wait)
       window.clearTimeout(show)
     }
-  }, [mood, quiet, held])
+  }, [mood, quiet, held, strike])
 
   /** Lean a little toward the stroking finger. */
   const lean = (deg: number) => tilt.current?.style.setProperty('--lean', `${deg}deg`)
@@ -151,12 +196,18 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
     bounce,
     shake,
     express,
+    pose: strike,
+    react,
     hearts: (n = 4) => {
       for (let i = 0; i < n; i++)
         window.setTimeout(() => spawn('heart', 35 + Math.random() * 30, 30 + Math.random() * 20), i * 110)
     },
-    chomp: () => {
-      express(moment('eating'), 1300)
+    chomp: (food) => {
+      if (food === 'carrot') strike('eat_carrot', 1300)
+      else {
+        dropPose()
+        express(moment('eating'), 1300)
+      }
       controls.start({
         scaleY: [1, 0.95, 1.02, 0.95, 1.02, 0.96, 1],
         scaleX: [1, 1.04, 0.99, 1.04, 0.99, 1.03, 1],
@@ -205,6 +256,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
     const s = g.current
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
     window.clearTimeout(s.timer)
+    dropPose()
     if (!s.sessionStart) s.sessionStart = performance.now()
     s.down = true
     s.sx = s.lx = e.clientX
@@ -251,7 +303,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
     if (s.moved > 28) {
       s.strokes++
       bounce()
-      express(moment('petted'), 1800)
+      react('petted', 2000)
     } else {
       s.taps.push(now)
       const recent = s.taps.filter((t) => now - t < 1000).length
@@ -259,38 +311,47 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
       if (recent >= 5) {
         shake()
         spawn('sweat', p.x, p.y)
-        express(moment('rough'), 1600)
+        react('rough', 1800)
       } else {
         spawn('spark', p.x, p.y)
         controls.start({ scaleY: [1, 0.94, 1], transition: { duration: 0.25 } })
-        express(moment('tap'), 1100)
+        if (Math.random() < 0.35) strike(poseFor('tap'), 1500)
+        else express(moment('tap'), 1100)
       }
     }
     s.timer = window.setTimeout(flush, 900)
   }
 
   const img = RIGS[rig].img
+  const shown = heldPose ?? (held ? null : posing)
   return (
     <div className="char-box" ref={box}>
       <div className={`char-shadow ${mood}`} aria-hidden />
       <motion.div className="char-motion" animate={controls} style={{ originY: 1 }}>
         <div className="char-tilt" ref={tilt}>
-          <div className={`char-idle ${mood} ${look.motion ? `m-${look.motion}` : ''}`}>
+          <div className={`char-idle ${mood} ${shown ? 'm-breathe' : look.motion ? `m-${look.motion}` : ''}`}>
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.div
-                key={rig}
+                key={shown ? `pose-${shown}` : rig}
                 className="char-pose"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <img src={asset(img)} alt="" className="char-img" draggable={false} />
-                <Face rig={rig} look={look} gaze={gaze} talking={talking} />
+                {shown ? (
+                  <img src={asset(poseSrc(shown))} alt="" className="char-img" draggable={false} />
+                ) : (
+                  <>
+                    <img src={asset(img)} alt="" className="char-img" draggable={false} />
+                    <Face rig={rig} look={look} gaze={gaze} talking={talking} />
+                  </>
+                )}
               </motion.div>
             </AnimatePresence>
-            <AccessoryLayer equipped={equipped} pose={rig} />
-            {mood === 'hungry' && !reaction && !held && (
+            {/* Outfits are fitted to the two standing poses; a picture pose is shown as it is. */}
+            {!shown && <AccessoryLayer equipped={equipped} pose={rig} />}
+            {mood === 'hungry' && !reaction && !held && !shown && (
               <div className="thought" aria-hidden>
                 <img src={asset('food_carrot.webp')} alt="" />
               </div>
@@ -312,7 +373,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
             bounce()
-            express(moment('petted'), 1800)
+            react('petted', 2000)
             onTouch?.({ strokes: 1, taps: 0, avgSpeed: 0.6, peakRate: 0, durationMs: 1200 })
           }
         }}
