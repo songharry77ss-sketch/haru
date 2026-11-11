@@ -206,6 +206,11 @@ export const api = {
     request<
       AppState & {
         reply: string
+        /** The same answer split into speech bubbles. Missing on servers older than the app. */
+        bubbles?: string[]
+        /** Name of the face the pet makes while answering. */
+        expression?: string
+        suggestions?: string[]
         emotion: { key: Emotion; label: string; intensity: number }
         risk: Risk
         helplines?: Helpline[]

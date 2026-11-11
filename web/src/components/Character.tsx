@@ -1,24 +1,16 @@
 import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { Mood } from '../lib/api'
+import { IDLE, LOOKS, moment, pick, type Look, type LookId } from '../lib/expressions'
 import { asset } from '../lib/store'
-import { AccessoryLayer, type Pose, type Slot } from './Accessory'
+import { AccessoryLayer, type Slot } from './Accessory'
+import { Face, RIGS } from './Face'
 
-const POSE_IMG: Record<Mood, { img: string; pose: Pose; blink?: string }> = {
-  happy: { img: 'bunny_happy.webp', pose: 'hug' },
-  excited: { img: 'bunny_happy.webp', pose: 'hug' },
-  calm: { img: 'bunny_calm.webp', pose: 'stand', blink: 'bunny_calm_blink.webp' },
-  sleepy: { img: 'bunny_calm_blink.webp', pose: 'stand' },
-  worried: { img: 'bunny_worried.webp', pose: 'stand', blink: 'bunny_worried_blink.webp' },
-  hungry: { img: 'bunny_worried.webp', pose: 'stand', blink: 'bunny_worried_blink.webp' },
-  hurt: { img: 'bunny_worried_blink.webp', pose: 'stand' },
-}
-
-// Warm the image cache so mood swaps and blinks never flash.
+// Warm the image cache so pose swaps never flash.
 if (typeof window !== 'undefined') {
-  for (const n of ['bunny_happy.webp', 'bunny_calm.webp', 'bunny_worried.webp', 'bunny_calm_blink.webp', 'bunny_worried_blink.webp']) {
+  for (const r of Object.values(RIGS)) {
     const i = new Image()
-    i.src = asset(n)
+    i.src = asset(r.img)
   }
 }
 
@@ -36,6 +28,8 @@ export interface CharacterHandle {
   hearts: (n?: number) => void
   /** Munching: a few quick squashes with crumbs. */
   chomp: () => void
+  /** Make a face for a moment, then go back to the resting one. */
+  express: (look: LookId, ms?: number) => void
 }
 
 interface Particle {
@@ -50,41 +44,78 @@ interface Props {
   equipped: Partial<Record<Slot, string>>
   onTouch?: (s: TouchSummary) => void
   interactive?: boolean
+  /** Hold this face instead of the mood's own (chat portrait, previews). */
+  look?: LookId
+  /** Mouth moves as if speaking. */
+  talking?: boolean
+  /** No little idle faces of its own. */
+  quiet?: boolean
 }
 
 let pid = 0
+const clamp = (v: number) => Math.max(-1, Math.min(1, v))
 
-export const Character = forwardRef<CharacterHandle, Props>(function Character({ mood, equipped, onTouch, interactive = true }, ref) {
+export const Character = forwardRef<CharacterHandle, Props>(function Character(
+  { mood, equipped, onTouch, interactive = true, look: held, talking, quiet },
+  ref,
+) {
   const controls = useAnimationControls()
   const [particles, setParticles] = useState<Particle[]>([])
   const box = useRef<HTMLDivElement>(null)
   const tilt = useRef<HTMLDivElement>(null)
-  const { img, pose, blink } = POSE_IMG[mood]
-  const [eyesShut, setEyesShut] = useState(false)
 
-  // Blink every few seconds, now and then twice in a row, like a living thing does.
+  // Which face is showing: a held one, else the one for a stroke in progress, else a passing reaction,
+  // else a little idle face, else the mood's resting face.
+  const [reaction, setReaction] = useState<LookId | null>(null)
+  const [stroking, setStroking] = useState<LookId | null>(null)
+  const [idle, setIdle] = useState<LookId | null>(null)
+  const [gaze, setGaze] = useState<[number, number] | null>(null)
+  const reactionTimer = useRef(0)
+  const busy = useRef(false)
   useEffect(() => {
-    setEyesShut(false)
-    if (!blink) return
+    busy.current = Boolean(reaction || stroking || held)
+  }, [reaction, stroking, held])
+
+  const id: LookId = held ?? stroking ?? reaction ?? idle ?? IDLE[mood][0]
+  const look: Look = LOOKS[id]
+  const rig = look.rig ?? 'stand'
+
+  const express = useCallback((next: LookId, ms = 2200) => {
+    window.clearTimeout(reactionTimer.current)
+    setReaction(next)
+    reactionTimer.current = window.setTimeout(() => setReaction(null), ms)
+  }, [])
+  useEffect(() => () => window.clearTimeout(reactionTimer.current), [])
+
+  // Left alone, the pet glances around, hums, blinks slowly: small signs of life between interactions.
+  useEffect(() => {
+    setIdle(null)
+    if (quiet || held) return
+    const extras = IDLE[mood].slice(1)
+    if (!extras.length) return
     let alive = true
-    let timer = 0
-    const shut = (again: boolean) => {
-      if (!alive) return
-      setEyesShut(true)
-      timer = window.setTimeout(() => {
-        setEyesShut(false)
-        timer = window.setTimeout(() => (again ? shut(false) : wait()), again ? 150 : 0)
-      }, 130)
+    let wait = 0
+    let show = 0
+    const loop = () => {
+      wait = window.setTimeout(
+        () => {
+          if (!alive) return
+          if (!busy.current && document.visibilityState === 'visible') {
+            setIdle(pick(`idle-${mood}`, extras))
+            show = window.setTimeout(() => alive && setIdle(null), 1500 + Math.random() * 1400)
+          }
+          loop()
+        },
+        5200 + Math.random() * 4200,
+      )
     }
-    const wait = () => {
-      timer = window.setTimeout(() => shut(Math.random() < 0.22), 2400 + Math.random() * 3600)
-    }
-    wait()
+    loop()
     return () => {
       alive = false
-      window.clearTimeout(timer)
+      window.clearTimeout(wait)
+      window.clearTimeout(show)
     }
-  }, [blink])
+  }, [mood, quiet, held])
 
   /** Lean a little toward the stroking finger. */
   const lean = (deg: number) => tilt.current?.style.setProperty('--lean', `${deg}deg`)
@@ -119,11 +150,13 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
   useImperativeHandle(ref, () => ({
     bounce,
     shake,
+    express,
     hearts: (n = 4) => {
       for (let i = 0; i < n; i++)
         window.setTimeout(() => spawn('heart', 35 + Math.random() * 30, 30 + Math.random() * 20), i * 110)
     },
     chomp: () => {
+      express(moment('eating'), 1300)
       controls.start({
         scaleY: [1, 0.95, 1.02, 0.95, 1.02, 0.96, 1],
         scaleX: [1, 1.04, 0.99, 1.04, 0.99, 1.03, 1],
@@ -136,6 +169,16 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
   const rel = (e: React.PointerEvent) => {
     const r = box.current!.getBoundingClientRect()
     return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 }
+  }
+
+  /** Eyes follow the finger. */
+  const watch = (e: React.PointerEvent) => {
+    const r = box.current?.getBoundingClientRect()
+    if (!r) return
+    const face = RIGS[rig]
+    const x = clamp((e.clientX - (r.left + (face.cx / 330) * r.width)) / (r.width * 0.3))
+    const y = clamp((e.clientY - (r.top + (face.cy / 520) * r.height)) / (r.height * 0.2))
+    setGaze((prev) => (prev && Math.abs(prev[0] - x) < 0.12 && Math.abs(prev[1] - y) < 0.12 ? prev : [x, y]))
   }
 
   const flush = () => {
@@ -168,6 +211,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
     s.sy = s.ly = e.clientY
     s.lt = performance.now()
     s.moved = 0
+    watch(e)
   }
   const onMove = (e: React.PointerEvent) => {
     const s = g.current
@@ -185,6 +229,11 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
       const r = box.current.getBoundingClientRect()
       lean(Math.max(-4, Math.min(4, ((e.clientX - (r.left + r.width / 2)) / r.width) * 9)))
     }
+    // A slow stroke is enjoyed with closed eyes; a fast one is watched warily.
+    if (s.moved > 28) {
+      if (d / dt < 1.6) setStroking((cur) => cur ?? moment('petting'))
+      else watch(e)
+    } else watch(e)
     if (s.sinceHeart > 46 && d / dt < 1.6) {
       s.sinceHeart = 0
       const p = rel(e)
@@ -196,10 +245,13 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
     if (!s.down) return
     s.down = false
     lean(0)
+    setGaze(null)
+    setStroking(null)
     const now = performance.now()
     if (s.moved > 28) {
       s.strokes++
       bounce()
+      express(moment('petted'), 1800)
     } else {
       s.taps.push(now)
       const recent = s.taps.filter((t) => now - t < 1000).length
@@ -207,44 +259,44 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
       if (recent >= 5) {
         shake()
         spawn('sweat', p.x, p.y)
+        express(moment('rough'), 1600)
       } else {
         spawn('spark', p.x, p.y)
         controls.start({ scaleY: [1, 0.94, 1], transition: { duration: 0.25 } })
+        express(moment('tap'), 1100)
       }
     }
     s.timer = window.setTimeout(flush, 900)
   }
 
+  const img = RIGS[rig].img
   return (
     <div className="char-box" ref={box}>
       <div className={`char-shadow ${mood}`} aria-hidden />
       <motion.div className="char-motion" animate={controls} style={{ originY: 1 }}>
         <div className="char-tilt" ref={tilt}>
-        <div className={`char-idle ${mood}`}>
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.img
-              key={img}
-              src={asset(img)}
-              alt=""
-              className="char-img"
-              draggable={false}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.22 }}
-            />
-          </AnimatePresence>
-          {blink && <img src={asset(blink)} alt="" className="char-img char-blink" draggable={false} style={{ opacity: eyesShut ? 1 : 0 }} />}
-          <AccessoryLayer equipped={equipped} pose={pose} />
-          {mood === 'sleepy' && <div className="zzz" aria-hidden>z z Z</div>}
-          {mood === 'hungry' && (
-            <div className="thought" aria-hidden>
-              <img src={asset('food_carrot.webp')} alt="" />
-            </div>
-          )}
-          {mood === 'hurt' && <div className="pain" aria-hidden />}
-          {mood === 'excited' && <div className="sparkles" aria-hidden>✦ ✧ ✦</div>}
-        </div>
+          <div className={`char-idle ${mood} ${look.motion ? `m-${look.motion}` : ''}`}>
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div
+                key={rig}
+                className="char-pose"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <img src={asset(img)} alt="" className="char-img" draggable={false} />
+                <Face rig={rig} look={look} gaze={gaze} talking={talking} />
+              </motion.div>
+            </AnimatePresence>
+            <AccessoryLayer equipped={equipped} pose={rig} />
+            {mood === 'hungry' && !reaction && !held && (
+              <div className="thought" aria-hidden>
+                <img src={asset('food_carrot.webp')} alt="" />
+              </div>
+            )}
+            {mood === 'hurt' && <div className="pain" aria-hidden />}
+          </div>
         </div>
       </motion.div>
       <div
@@ -260,6 +312,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character({
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
             bounce()
+            express(moment('petted'), 1800)
             onTouch?.({ strokes: 1, taps: 0, avgSpeed: 0.6, peakRate: 0, durationMs: 1200 })
           }
         }}

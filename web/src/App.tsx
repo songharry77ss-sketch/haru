@@ -4,6 +4,7 @@ import { HelpSheet, Toasts } from './components/Overlay'
 import { initNative } from './lib/native'
 import { HaruProvider, asset, useHaru } from './lib/store'
 import { Analysis } from './screens/Analysis'
+import { FaceSheet } from './screens/Faces'
 import { Chat } from './screens/Chat'
 import { Quests, RestMode } from './screens/Extras'
 import { Guardian } from './screens/Guardian'
@@ -73,6 +74,7 @@ function Shell() {
 
 export default function App() {
   const guardian = location.pathname.match(/^\/guardian\/([A-Za-z0-9-]+)/)
+  if (import.meta.env.DEV && location.search === '?faces') return <FaceSheet />
   return (
     <HaruProvider>
       <main className="frame">

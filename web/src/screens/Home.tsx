@@ -4,6 +4,7 @@ import { Stage } from '../components/Stage'
 import type { CharacterHandle, TouchSummary } from '../components/Character'
 import { Bolt, Carrot, Chart, Coin, Gear, Gem, Paw, Search, Send, Shirt, Store } from '../components/Icons'
 import { api } from '../lib/api'
+import { greeting, moment } from '../lib/expressions'
 import { tap } from '../lib/native'
 import { asset, useHaru } from '../lib/store'
 
@@ -24,6 +25,21 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
   const [hint, setHint] = useState(firstVisit)
   const [bite, setBite] = useState<{ id: number; img: string; x: number } | null>(null)
   const charRef = useRef<CharacterHandle>(null)
+
+  // A hello that fits the hour, warmer after a long time apart.
+  useEffect(() => {
+    let last = 0
+    try {
+      last = Number(localStorage.getItem('haru.seen')) || 0
+      localStorage.setItem('haru.seen', String(Date.now()))
+    } catch {
+      /* private mode */
+    }
+    const away = last ? (Date.now() - last) / 3_600_000 : 0
+    const t = window.setTimeout(() => charRef.current?.express(greeting(new Date().getHours(), away), 2600), 500)
+    return () => window.clearTimeout(t)
+  }, [])
+
   if (!state) return null
   const { pet, user, quests } = state
   const questDone = quests.filter((q) => q.done).length
@@ -33,7 +49,8 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
     try {
       const r = apply(await api.touch(s))
       say(r.line)
-      if (!r.rough) {
+      if (r.rough) charRef.current?.express(moment('rough'), 2200)
+      else {
         charRef.current?.hearts(3)
         tap()
       }
@@ -51,6 +68,7 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
       const r = apply(await api.feed(food.id))
       if (r.refused) {
         charRef.current?.shake()
+        charRef.current?.express(moment('refused'), 2200)
         say(r.line)
       } else {
         // The food flies to the pet's mouth, then it munches and answers.
@@ -61,6 +79,7 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
           say(r.line)
           charRef.current?.hearts(2)
         }, 430)
+        window.setTimeout(() => charRef.current?.express(moment('fed'), 2400), 1750)
       }
       rewardToast(r.reward)
     } catch (e) {

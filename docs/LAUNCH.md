@@ -8,7 +8,7 @@
 | 항목 | 상태 |
 | --- | --- |
 | 코드 | 완료. `npm test` 18개 통과 |
-| 웹 배포 | **안 됨.** 목표 주소 `https://haru-companion-kr.vercel.app` (앱에 이 주소가 들어 있음) |
+| 웹 배포 | **됨** (2026-11-11). `https://haru-companion-kr.vercel.app`, Vercel 팀 `Harry's projects`, GitHub 연결됨. Neon DB `haru-companion-kr-db`(Singapore, Free) 연결. **`ANTHROPIC_API_KEY`만 아직 없음**: health의 `ai`가 `offline` |
 | Android | 서명된 출시 파일 `haru-1.0-release.aab`(versionCode 1) 빌드 완료. 파일과 업로드 키(`haru-android-signing-key.zip`)는 소유자에게 전달됨. Play Console 업로드는 아직 |
 | iOS | GitHub Actions 워크플로(`iOS → App Store Connect`) 준비됨. 저장소 Secrets 4개가 없어서 아직 빌드 못 함 |
 | 스토어 자료 | `store/ios`, `store/android`에 스크린샷·아이콘, 문구와 양식 답변은 `store/STORE.md` |

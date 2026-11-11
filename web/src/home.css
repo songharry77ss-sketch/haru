@@ -177,6 +177,324 @@
     transform: translateY(0) scale(1, 1);
   }
 }
+/* A face can bring its own body language, which then replaces the mood's. */
+.char-idle.m-breathe {
+  animation: breathe 3.6s ease-in-out infinite;
+}
+.char-idle.m-still {
+  animation: breathe 6s ease-in-out infinite;
+}
+.char-idle.m-hop {
+  animation: hop 1.6s ease-in-out infinite;
+}
+.char-idle.m-doze {
+  animation: doze 5.2s ease-in-out infinite;
+}
+.char-idle.m-droop {
+  animation: droop 4.2s ease-in-out infinite;
+}
+.char-idle.m-sway {
+  animation: sway 2.4s ease-in-out infinite;
+}
+.char-idle.m-nod {
+  animation: nod 1.1s ease-in-out infinite;
+}
+.char-idle.m-shake {
+  animation: shake-no 0.5s ease-in-out infinite;
+}
+.char-idle.m-tiltL {
+  animation: tilt-l 2.6s ease-in-out infinite;
+}
+.char-idle.m-tiltR {
+  animation: tilt-r 2.6s ease-in-out infinite;
+}
+.char-idle.m-shiver {
+  animation: shiver 0.18s linear infinite;
+}
+.char-idle.m-wiggle {
+  animation: wiggle 0.7s ease-in-out infinite;
+}
+.char-idle.m-jump {
+  animation: jump 0.9s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
+}
+.char-idle.m-stretch {
+  animation: stretch 2.2s ease-in-out infinite;
+}
+.char-idle.m-lean {
+  animation: lean-in 2.8s ease-in-out infinite;
+}
+.char-idle.m-bounce {
+  animation: bounce-soft 0.8s ease-in-out infinite;
+}
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-2.4deg);
+  }
+  50% {
+    transform: rotate(2.4deg);
+  }
+}
+@keyframes nod {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  45% {
+    transform: translateY(1.2%) scale(1.012, 0.972);
+  }
+}
+@keyframes shake-no {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0);
+  }
+  25% {
+    transform: translateX(-1.6%) rotate(-1.6deg);
+  }
+  75% {
+    transform: translateX(1.6%) rotate(1.6deg);
+  }
+}
+@keyframes tilt-l {
+  0%,
+  100% {
+    transform: rotate(-3.2deg);
+  }
+  50% {
+    transform: rotate(-5deg) scale(1.006, 0.994);
+  }
+}
+@keyframes tilt-r {
+  0%,
+  100% {
+    transform: rotate(3.2deg);
+  }
+  50% {
+    transform: rotate(5deg) scale(1.006, 0.994);
+  }
+}
+@keyframes shiver {
+  0%,
+  100% {
+    transform: translateX(-0.5%);
+  }
+  50% {
+    transform: translateX(0.5%);
+  }
+}
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-2deg) scale(1.01, 0.99);
+  }
+  50% {
+    transform: rotate(2deg) scale(0.99, 1.01);
+  }
+}
+@keyframes jump {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.05, 0.93);
+  }
+  40% {
+    transform: translateY(-8%) scale(0.97, 1.05);
+  }
+  70% {
+    transform: translateY(-1%) scale(1, 1);
+  }
+}
+@keyframes stretch {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  45%,
+  60% {
+    transform: scale(0.972, 1.045);
+  }
+}
+@keyframes lean-in {
+  0%,
+  100% {
+    transform: scale(1, 1) rotate(0.6deg);
+  }
+  50% {
+    transform: scale(1.025, 1.025) rotate(-0.6deg);
+  }
+}
+@keyframes bounce-soft {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.02, 0.975);
+  }
+  50% {
+    transform: translateY(-2.2%) scale(0.99, 1.015);
+  }
+}
+.char-pose {
+  position: absolute;
+  inset: 0;
+}
+/* The live face sits exactly over the render: same box, same aspect. */
+.char-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 0.5px 0.4px rgba(60, 25, 15, 0.28));
+}
+.char-face text {
+  font-family: inherit;
+}
+.char-face .face-twinkle,
+.char-face .face-spin,
+.char-face .face-pulse,
+.char-face .face-pop,
+.char-face .face-bubble,
+.char-face .face-chew {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.char-face .face-twinkle {
+  animation: face-twinkle 1.3s ease-in-out infinite;
+}
+.char-face .face-spin {
+  animation: face-spin 1.1s linear infinite;
+}
+.char-face .face-pulse {
+  animation: face-pulse 0.7s ease-in-out infinite;
+}
+.char-face .face-pop {
+  animation: face-pop 0.9s ease-in-out infinite;
+}
+.char-face .face-bubble {
+  animation: face-bubble 2.6s ease-in-out infinite;
+}
+.char-face .face-chew {
+  animation: face-chew 0.34s ease-in-out infinite;
+}
+.char-face .face-float {
+  animation: face-float 1.8s ease-in-out infinite;
+}
+.char-face .face-slide {
+  animation: face-slide 1.5s ease-in infinite;
+}
+.char-face .face-stream {
+  animation: face-stream 0.6s ease-in-out infinite;
+}
+.char-face .face-puff {
+  animation: face-puff 1.4s ease-out infinite;
+}
+.char-face .face-zzz {
+  animation: face-float 2.4s ease-in-out infinite;
+}
+.char-face .face-orbit {
+  animation: face-orbit 1.6s ease-in-out infinite;
+}
+@keyframes face-twinkle {
+  0%,
+  100% {
+    transform: scale(0.82) rotate(-8deg);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.12) rotate(8deg);
+    opacity: 1;
+  }
+}
+@keyframes face-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes face-pulse {
+  50% {
+    transform: scale(1.25);
+  }
+}
+@keyframes face-pop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.12);
+  }
+}
+@keyframes face-bubble {
+  0%,
+  100% {
+    transform: scale(0.45);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+}
+@keyframes face-chew {
+  50% {
+    transform: scale(1.25, 0.6);
+  }
+}
+@keyframes face-float {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+@keyframes face-slide {
+  0% {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(9px);
+    opacity: 0;
+  }
+}
+@keyframes face-stream {
+  50% {
+    transform: translateY(2px);
+  }
+}
+@keyframes face-puff {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.15) translateY(-5px);
+    opacity: 0;
+  }
+}
+@keyframes face-orbit {
+  0%,
+  100% {
+    transform: translateX(-9px);
+  }
+  50% {
+    transform: translateX(9px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .char-idle[class*='m-'],
+  .char-face [class^='face-'] {
+    animation: none;
+  }
+}
 /* Soft contact shadow that tightens while the pet is in the air. */
 .char-shadow {
   position: absolute;

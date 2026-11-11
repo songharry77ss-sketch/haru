@@ -119,11 +119,20 @@ test("chat answers offline, hides contact details and escalates crisis language"
   assert.equal(calm.emotion.key, "anxious");
   assert.equal(calm.risk, "none");
   assert.ok(calm.reply.length > 0);
+  // The answer also arrives as speech bubbles with a face and a few quick answers; `reply` stays for older app builds.
+  assert.ok(Array.isArray(calm.bubbles) && calm.bubbles.length >= 1);
+  assert.equal(calm.reply, calm.bubbles.join("\n"));
+  assert.equal(typeof calm.expression, "string");
+  assert.ok(Array.isArray(calm.suggestions) && calm.suggestions.length <= 3);
 
   const crisis = (await call("/chat", { token, body: { text: "그냥 죽고 싶어" } })).json;
   assert.equal(crisis.risk, "high");
   assert.match(crisis.reply, /1388/);
   assert.equal(crisis.helplines.length, 3);
+  // A crisis is answered with the fixed message only: no cheerful face, no quick-answer chips.
+  assert.equal(crisis.expression, "caring");
+  assert.deepEqual(crisis.suggestions, []);
+  assert.equal(crisis.reply, crisis.bubbles.join("\n"));
 
   const history = (await call("/chat", { token })).json.messages;
   assert.equal(history.length, 4);

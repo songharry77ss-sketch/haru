@@ -149,10 +149,49 @@
   font-size: 13px;
   width: 78px;
 }
+/* The pet's face watches the conversation: it listens, thinks, and moves its mouth while it answers. */
+.chat-pet {
+  display: grid;
+  place-items: center;
+  padding: 10px 0 4px;
+  flex-shrink: 0;
+}
+.chat-pet-clip {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 38%, #fff8f2, #f8dccf);
+  box-shadow:
+    0 8px 20px rgba(170, 80, 60, 0.18),
+    inset 0 0 0 3px #fff;
+}
+.chat-pet-box {
+  position: absolute;
+  left: -13.4%;
+  top: -50%;
+  width: 122%;
+  aspect-ratio: 330 / 520;
+}
+.chat-pet .char-shadow,
+.chat-pet .char-hit,
+.chat-pet .thought {
+  display: none;
+}
+.chat-pet .char-img {
+  filter: none;
+}
+@media (max-height: 620px) {
+  .chat-pet-clip {
+    width: 72px;
+    height: 72px;
+  }
+}
 .chat-list {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 14px;
+  padding: 12px 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1513,4 +1552,92 @@
   justify-content: center;
   gap: 14px;
   text-align: center;
+}
+
+/* ---------- face gallery ---------- */
+.faces {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 16px calc(16px + var(--safe-bottom));
+  max-height: 84dvh;
+}
+.faces h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: center;
+}
+.faces h2 b {
+  color: var(--coral-strong);
+}
+.faces-stage {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.faces-pet {
+  position: relative;
+  height: 190px;
+  aspect-ratio: 330 / 520;
+}
+.faces-pet .char-hit {
+  display: none;
+}
+.faces-name {
+  margin: 0;
+  font-weight: 800;
+  font-size: 15px;
+}
+.faces-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 8px;
+  overflow-y: auto;
+  padding: 4px 2px 8px;
+  min-height: 0;
+}
+.face-tile {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  background: none;
+  text-align: center;
+}
+.face-mini {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 38%, #fff8f2, #f8e2d6);
+  box-shadow: inset 0 0 0 2px transparent;
+  transition: box-shadow 0.15s;
+}
+.face-tile.on .face-mini {
+  box-shadow: inset 0 0 0 3px var(--coral);
+}
+.face-mini-box {
+  position: absolute;
+  left: -13.4%;
+  top: -50%;
+  width: 122%;
+  aspect-ratio: 330 / 520;
+}
+.face-mini .char-img {
+  filter: none;
+}
+/* A hundred faces twinkling at once is too much: the small ones hold still. */
+.face-mini .char-face,
+.face-mini .char-face * {
+  animation: none !important;
+  filter: none;
+}
+.face-label {
+  font-size: 11px;
+  line-height: 1.25;
+  color: #8a6258;
+  word-break: keep-all;
 }

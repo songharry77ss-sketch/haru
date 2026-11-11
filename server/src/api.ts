@@ -6,7 +6,7 @@ import { code, newToken, requireUser, sha256, userById, type User } from "./auth
 import { CHARACTERS, FOODS, ITEMS, STARTER_ITEMS, itemById, relationship, type FoodId } from "./catalog.js";
 import { dailyQuests, grant, loadPet, logEvent, petView, react, savePet, type Mood, type PetRow } from "./pet.js";
 import { behavior, loadWindow, report, routine } from "./analysis.js";
-import { companionReply, llmEnabled } from "./llm.js";
+import { companionReply, HISTORY_WINDOW, llmEnabled, toBubbles } from "./llm.js";
 import { EMOTION_LABEL, HELPLINES, assessRisk, crisisReply, redactPII, type Emotion } from "./safety.js";
 import { dayKey, dayStart, isLateNight, local, mealFor } from "./time.js";
 
@@ -427,7 +427,9 @@ api.post(
     const view = petView(pet, now);
     const risk = assessRisk(text);
 
-    let reply: string;
+    let bubbles: string[];
+    let expression: string;
+    let suggestions: string[] = [];
     let petMood: Mood;
     let emotion: Emotion;
     let intensity: number;
@@ -435,15 +437,16 @@ api.post(
 
     if (risk === "high") {
       // Never left to a model: a fixed, reviewed message with real helplines.
-      reply = crisisReply(user.pet_name);
+      bubbles = toBubbles(crisisReply(user.pet_name));
+      expression = "caring";
       petMood = "worried";
       emotion = "sad";
       intensity = 1;
     } else {
       const [history, diary] = await Promise.all([
         query<{ role: "user" | "assistant"; content: string }>(
-          "SELECT role, content FROM messages WHERE user_id = ? AND content <> '[일기]' ORDER BY id DESC LIMIT 8",
-          [user.id],
+          "SELECT role, content FROM messages WHERE user_id = ? AND content <> '[일기]' ORDER BY id DESC LIMIT ?",
+          [user.id, HISTORY_WINDOW],
         ),
         one<{ content: string }>("SELECT content FROM diary WHERE user_id = ? ORDER BY id DESC LIMIT 1", [user.id]),
       ]);
@@ -465,15 +468,22 @@ api.post(
         text,
         { allowModel },
       );
-      reply = out.reply;
+      bubbles = out.bubbles;
+      expression = out.expression;
+      suggestions = out.suggestions;
       petMood = out.petMood;
       emotion = out.userEmotion;
       intensity = out.intensity;
       if (out.risk === "high") {
         finalRisk = "high";
-        reply = `${reply}\n\n${crisisReply(user.pet_name)}`;
+        bubbles = [...bubbles, ...toBubbles(crisisReply(user.pet_name))];
+        expression = "caring";
       } else if (out.risk === "watch" && finalRisk === "none") finalRisk = "watch";
+      // Quick answers are for light moments only.
+      if (finalRisk !== "none") suggestions = [];
     }
+    // Older app builds read the whole answer from `reply`; newer ones show `bubbles` one by one.
+    const reply = bubbles.join("\n");
 
     const next = react({ ...pet, intimacy: Math.min(100, pet.intimacy + 0.4) }, petMood, 10, now);
     await Promise.all([
@@ -488,6 +498,9 @@ api.post(
     const reward = await grant(user.id, "chat", 3, 3, 0, now);
     res.json({
       reply,
+      bubbles,
+      expression,
+      suggestions,
       emotion: { key: emotion, label: EMOTION_LABEL[emotion], intensity },
       risk: finalRisk,
       helplines: finalRisk !== "none" ? HELPLINES : undefined,

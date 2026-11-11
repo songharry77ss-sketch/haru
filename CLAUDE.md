@@ -20,6 +20,9 @@
 - `server/src/api.ts` 라우트, `analysis.ts` 행동 기반 정서 분석, `llm.ts` Claude 대화(+내장 답변), `safety.ts` 위험 감지,
   `db.ts` DB 접속과 스키마(운영: `DATABASE_URL`의 Postgres, 개발·테스트: 내장 PGlite)
 - `web/src` React + Vite. `screens/` 화면, `components/Character.tsx` 캐릭터 동작
+- 표정: 얼굴을 지운 바탕 그림(`bunny_stand_base.webp`, `bunny_hug_base.webp`) 위에 `components/Face.tsx`가 눈·눈썹·입·효과를 그린다.
+  표정 목록과 상황별 선택은 `lib/expressions.ts`(`LOOKS`, `IDLE`, `MOMENTS`). 개발 서버에서 `/?faces`를 열면 전체 표정을 한 화면에서 볼 수 있다.
+  대화 답변의 표정 이름은 서버 `llm.ts`의 `EXPRESSIONS`와 맞춘다(앱이 모르는 이름은 무시된다).
 - `web/android`, `web/ios` Capacitor 프로젝트. 앱 ID `kr.haru.companion`. 앱이 접속할 서버 주소는 `web/.env.native`
 - `scripts/build-vercel.mjs` Vercel 빌드, `vercel.json`이 이를 호출 → `main`에 push 하면 자동 배포
 - `store/` 스토어 스크린샷과 등록 문구(`STORE.md`)

@@ -2,13 +2,16 @@ import { useState } from 'react'
 import { Check, Phone } from '../components/Icons'
 import { Panel, Sheet } from '../components/Overlay'
 import { PUBLIC_URL, api } from '../lib/api'
+import { LOOK_IDS } from '../lib/expressions'
 import { useHaru } from '../lib/store'
+import { Faces } from './Faces'
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const { state, catalog, apply, toast, fail, signOut } = useHaru()
   const [petName, setPetName] = useState(state?.user.petName ?? '')
   const [nickname, setNickname] = useState(state?.user.nickname ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [faces, setFaces] = useState(false)
   if (!state) return null
   const { user } = state
   const guardianUrl = `${PUBLIC_URL}/guardian/${user.guardianCode}`
@@ -86,6 +89,16 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </section>
 
         <section className="card">
+          <h2 className="section-title">표정 도감</h2>
+          <p className="muted small">
+            {user.petName}는 기분과 상황에 따라 {LOOK_IDS.length}가지 표정을 지어요. 어떤 표정이 있는지 구경해 보세요.
+          </p>
+          <button className="btn block soft" onClick={() => setFaces(true)}>
+            표정 구경하기
+          </button>
+        </section>
+
+        <section className="card">
           <h2 className="section-title">다른 기기에서 이어하기</h2>
           <p className="muted small">이 코드를 안전한 곳에 적어두면, 새 기기에서도 {user.petName}를 다시 만날 수 있어요.</p>
           <div className="code-box">
@@ -140,6 +153,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </section>
       </div>
 
+      <Faces open={faces} onClose={() => setFaces(false)} />
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} label="계정 삭제 확인">
         <div className="buy">
           <h2>정말 모든 기록을 지울까요?</h2>

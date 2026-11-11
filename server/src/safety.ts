@@ -65,7 +65,7 @@ export function crisisReply(petName: string): string {
 
 /** Lightweight Korean lexicon used when no model is configured, and as a cross-check. */
 const LEXICON: [Emotion, RegExp][] = [
-  ["anxious", /불안|걱정|무서|떨려|긴장|두려|초조|시험|발표/],
+  ["anxious", /불안|걱정|무서|떨려|긴장|두려|초조/],
   ["sad", /슬퍼|슬프|우울|눈물|울었|울고|속상|서운|힘들|힘든|아파/],
   ["lonely", /외로|혼자|심심|친구가?\s*없|아무도/],
   ["angry", /화나|화가|짜증|열받|싫어|미워|억울/],
@@ -73,11 +73,15 @@ const LEXICON: [Emotion, RegExp][] = [
   ["joy", /좋아|신나|행복|기뻐|재밌|재미있|최고|상\s*받|칭찬|뿌듯|설레|ㅋㅋ|ㅎㅎ/],
 ];
 
+/** Topics that often come with a feeling but do not name one: they only tip the balance when nothing else is said. */
+const HINTS: Partial<Record<Emotion, RegExp>> = { anxious: /시험|발표|면접|대회/ };
+
 export function lexiconEmotion(text: string): { emotion: Emotion; intensity: number } {
   let best: Emotion = "calm";
   let hits = 0;
   for (const [emo, re] of LEXICON) {
-    const n = (text.match(new RegExp(re.source, "g")) ?? []).length;
+    const hint = HINTS[emo];
+    const n = (text.match(new RegExp(re.source, "g")) ?? []).length + (hint && hint.test(text) ? 0.5 : 0);
     if (n > hits) {
       best = emo;
       hits = n;
