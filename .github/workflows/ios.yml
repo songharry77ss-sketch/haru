@@ -3,38 +3,46 @@ name: iOS → App Store Connect
 # Builds the iPhone app on a GitHub-hosted Mac and uploads it to App Store Connect (TestFlight).
 # Needs repository secrets: APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY (contents of the .p8 file).
 # The server address the app talks to comes from web/.env.native.
+#
+# Signing: the archive is built unsigned and signed for the App Store only at export, with the
+# App Store Connect key (cloud signing). Signing during the archive would first need a development
+# profile, and that needs a registered test device, which this team does not have.
 on:
   workflow_dispatch:
     inputs:
       api_base:
         description: "API server URL (leave empty to use web/.env.native)"
         required: false
+      build_number:
+        description: "Build number (a whole number that goes up with every upload). Empty: run number + 1"
+        required: false
+
+env:
+  MINIMUM_XCODE_MAJOR: "26"
 
 jobs:
   build:
-    runs-on: macos-15
-    timeout-minutes: 45
+    runs-on: macos-26
+    timeout-minutes: 60
     env:
       API_BASE: ${{ inputs.api_base }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Check inputs
+      - name: Check inputs and Xcode
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          REQUESTED_BUILD: ${{ inputs.build_number }}
         run: |
+          set -euo pipefail
           missing=""
           for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
@@ -48,54 +56,91 @@ jobs:
             *) echo "::error::ASC_PRIVATE_KEY must be the full contents of the .p8 file, including the BEGIN/END lines"; exit 1 ;;
           esac
           xcodebuild -version
+          major="$(xcodebuild -version | awk 'NR == 1 { split($2, parts, "."); print parts[1] }')"
+          if (( major < MINIMUM_XCODE_MAJOR )); then
+            echo "::error::App Store uploads need Xcode $MINIMUM_XCODE_MAJOR or later; this runner selected Xcode $major."
+            exit 1
+          fi
+          build="${REQUESTED_BUILD:-$(( ${{ github.run_number }} + 1 ))}"
+          case "$build" in ''|*[!0-9]*) echo "::error::build_number must be a whole number"; exit 1 ;; esac
+          echo "BUILD_NUMBER=$build" >> "$GITHUB_ENV"
+          echo "ARCHIVE=$RUNNER_TEMP/Haru.xcarchive" >> "$GITHUB_ENV"
+          echo "Build number $build"
 
       - name: Build web app
         run: |
+          set -euo pipefail
           npm ci
           if [ -n "$API_BASE" ]; then export VITE_API_BASE="$API_BASE"; fi
           npm run build:native -w web
 
       - name: App Store Connect key
         env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
+          set -euo pipefail
+          umask 077
           mkdir -p "$RUNNER_TEMP/keys"
-          printf '%s\n' "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/keys/AuthKey.p8"
+          key_file="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+          # Rebuilt from the base64 body: a key pasted on Windows can carry \r, stray spaces or a BOM,
+          # and Xcode accepts only a clean PEM document.
+          body=$(printf '%s' "$ASC_PRIVATE_KEY" | sed -e 's/-----BEGIN PRIVATE KEY-----//' -e 's/-----END PRIVATE KEY-----//' | tr -cd 'A-Za-z0-9+/=')
+          { echo "-----BEGIN PRIVATE KEY-----"; printf '%s\n' "$body" | fold -w 64; echo "-----END PRIVATE KEY-----"; } > "$key_file"
+          echo "Key body: ${#body} base64 characters (an App Store Connect .p8 key has about 200)."
+          echo "ASC_KEY_PATH=$key_file" >> "$GITHUB_ENV"
 
-      - name: Archive
+      - name: Archive (unsigned)
         working-directory: web/ios/App
         run: |
+          set -euo pipefail
           xcodebuild -project App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/Haru.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGN_STYLE=Automatic \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-            archive | tail -n 40
+            -archivePath "$ARCHIVE" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO \
+            archive > "$RUNNER_TEMP/archive.log" 2>&1 || { tail -n 80 "$RUNNER_TEMP/archive.log"; exit 1; }
+          tail -n 5 "$RUNNER_TEMP/archive.log"
+          app="$ARCHIVE/Products/Applications/App.app"
+          test -d "$app" || { echo "::error::The archive has no App.app"; exit 1; }
+          # Ad-hoc sign nested code first, then the app, so the export can re-sign it for the App Store.
+          if [ -d "$app/Frameworks" ]; then
+            find "$app/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -exec codesign --force --sign - --timestamp=none {} \;
+          fi
+          codesign --force --sign - --timestamp=none "$app"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' -c 'Print :CFBundleShortVersionString' -c 'Print :CFBundleVersion' "$app/Info.plist"
 
-      - name: Upload to App Store Connect
+      - name: Sign for the App Store and upload
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
+          set -euo pipefail
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
             <key>method</key><string>app-store-connect</string>
             <key>destination</key><string>upload</string>
-            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
             <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
             <key>uploadSymbols</key><true/>
           </dict></plist>
           PLIST
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
           xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/Haru.xcarchive" \
+            -archivePath "$ARCHIVE" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-          echo "Uploaded build ${{ github.run_number }} — it appears in App Store Connect → TestFlight after processing (5–30 min)."
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" > "$RUNNER_TEMP/export.log" 2>&1 || { tail -n 80 "$RUNNER_TEMP/export.log"; exit 1; }
+          tail -n 15 "$RUNNER_TEMP/export.log"
+          echo "Uploaded build $BUILD_NUMBER. It appears in App Store Connect → TestFlight after processing (5–30 min)."
+
+      - name: Remove the key from the runner
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys" "$RUNNER_TEMP/ExportOptions.plist"
