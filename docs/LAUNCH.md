@@ -23,6 +23,17 @@
 - Play Store: CRAVING 조직 계정에 앱 생성 완료(3-1, 패키지 `kr.haru.companion`, 한국어·앱·무료). 스토어 등록정보와 앱 콘텐츠 양식은 아직.
 - Android 파일: 기존 `haru-1.0-release.aab`에는 표정·포즈 추가 전 화면이 들어 있다. 새 화면을 넣으려면 `versionCode`를 올려 다시 빌드해야 하는데, 이 PC에는 JDK·Android SDK가 없다.
 
+### 2026-11-12 진행 기록
+
+- AI 대화: `ANTHROPIC_API_KEY` 등록 후 재배포, health `ai: model`. 실제 대화 3턴 확인(말풍선·표정·빠른 답 정상).
+- iOS: `ios.yml`을 "서명 없이 아카이브 → 내보낼 때 App Store 서명" 방식으로 고쳐 빌드 5(1.0) 업로드 완료, 버전 1.0에 연결.
+  App Store Connect에 설명·키워드·URL·심사 메모·스크린샷 7장(`store/ios-6.3`)·부제·카테고리·가격(무료)·판매 국가(대한민국)·저작권 입력. 연령 등급과 개인정보 답변은 소유자가 완료.
+  **남은 것(소유자):** 앱 정보 → 콘텐츠 권한("아니요"), 버전 페이지 연락처 전화번호(이름·이메일은 채워 둠, 저장 필요). 그다음 "심사에 추가".
+- Android: 새 업로드 키를 만들어 `Desktop/01_크레이빙(회사·서비스)/하루 관련/하루-앱-중요파일`에 보관(`haru-upload.jks`, `키 정보.txt`). 저장소 Secrets 3개 등록됨.
+  `android.yml`로 서명된 번들 생성(versionCode 4): `Downloads/haru-1.0-release-4.aab`.
+- Play Console 앱 콘텐츠: 개인정보처리방침·광고 없음·로그인 없음·광고 ID 미사용·정부 앱 아님·금융 기능 없음·건강(스트레스 관리·휴식·정신력)·콘텐츠 등급(전체이용가, 생성형 AI 콘텐츠 있음으로 응답) 저장.
+  **멈춘 곳:** 타겟층 및 콘텐츠. 소유자가 9–12세 포함을 선택했고, 2단계의 "아동 관련 법(COPPA·GDPR 등) 준수 보증" 체크는 소유자 판단이 필요해 비워 둠. 데이터 보안, 스토어 등록정보(문구·그래픽), 번들 업로드는 아직.
+
 ## 1. 웹 배포 (Vercel)
 
 1. <https://vercel.com/new> → GitHub로 로그인(Hobby 무료) → `songharry77ss-sketch/haru` Import.
