@@ -14,6 +14,15 @@
 | 스토어 자료 | `store/ios`, `store/android`에 스크린샷·아이콘, 문구와 양식 답변은 `store/STORE.md` |
 | AI 모델 | 미정. 소유자가 비용을 보고 정하기로 함(환경 변수 `CLAUDE_MODEL`) |
 
+### 2026-11-11 진행 기록
+
+- 웹: 표정 119종(실시간 얼굴)·포즈 79종(Codex로 생성한 그림)·말풍선 대화가 `main`에 반영되어 운영 중.
+- AI 대화: 아직 내장 답변 모드. 크롬에 로그인된 Claude Console 계정(opqrttuk)은 잔액 0. 크레딧이 있는 계정(opqrttuj)으로 **소유자가** 키를 만들어 Vercel `ANTHROPIC_API_KEY`에 붙여넣고 재배포해야 한다. 실제 AI 답변 경로는 키가 없어 아직 한 번도 검증하지 못했다.
+- App Store: 번들 ID `kr.haru.companion` 등록 완료(2-1), 앱 레코드 생성 완료(2-2, Apple ID `6833322014`, 팀 CRAVING `UQLDQDU878`).
+  2-3의 API 키 `haru-ci`(관리자)는 생성 창에 값만 채워 둠: **"생성" 클릭과 `.p8` 내려받기, 2-4의 Secrets 4개 등록은 소유자가 직접** (자동 권한 검사에서 Claude의 키 생성·Secret 등록이 거부됨).
+- Play Store: CRAVING 조직 계정에 앱 생성 완료(3-1, 패키지 `kr.haru.companion`, 한국어·앱·무료). 스토어 등록정보와 앱 콘텐츠 양식은 아직.
+- Android 파일: 기존 `haru-1.0-release.aab`에는 표정·포즈 추가 전 화면이 들어 있다. 새 화면을 넣으려면 `versionCode`를 올려 다시 빌드해야 하는데, 이 PC에는 JDK·Android SDK가 없다.
+
 ## 1. 웹 배포 (Vercel)
 
 1. <https://vercel.com/new> → GitHub로 로그인(Hobby 무료) → `songharry77ss-sketch/haru` Import.
