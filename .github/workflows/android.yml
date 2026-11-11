@@ -1,0 +1,104 @@
+name: Android → release bundle (AAB)
+
+# Builds the Android App Bundle on a GitHub-hosted Linux machine and keeps it as a downloadable artifact
+# (Actions → this run → Artifacts → haru-android-aab), ready to upload in Play Console.
+# Signing needs repository secrets:
+#   ANDROID_KEYSTORE_BASE64    the upload key file (haru-upload.jks), base64-encoded
+#   ANDROID_KEYSTORE_PASSWORD  store password from the owner's key notes
+#   ANDROID_KEY_PASSWORD       key password from the owner's key notes (alias: haru-upload)
+# Without them the bundle is still built, to prove the build works, but the run ends in an error
+# because Play only accepts signed bundles.
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "versionCode (must be higher than every bundle already uploaded to Play). Empty: run number + 1"
+        required: false
+      api_base:
+        description: "API server URL (leave empty to use web/.env.native)"
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      API_BASE: ${{ inputs.api_base }}
+      HARU_VERSION_CODE: ${{ inputs.version_code || github.run_number + 1 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-36 build-tools;35.0.0 platform-tools"
+
+      - name: Build web app and copy it into the Android project
+        run: |
+          npm ci
+          if [ -n "$API_BASE" ]; then export VITE_API_BASE="$API_BASE"; fi
+          npm run build -w web -- --mode native
+          cd web && npx cap sync android
+
+      - name: Upload key
+        id: key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=""
+          for name in KEYSTORE_B64 STORE_PASSWORD KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Signing secrets missing (ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_PASSWORD): building an unsigned bundle only."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s' "$KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/keys/haru-upload.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/keys/haru-upload.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=haru-upload"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > "$RUNNER_TEMP/keys/keystore.properties"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build bundle
+        working-directory: web/android
+        run: |
+          if [ "${{ steps.key.outputs.signed }}" = "true" ]; then export HARU_KEYSTORE_PROPERTIES="$RUNNER_TEMP/keys/keystore.properties"; fi
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon --stacktrace | tail -n 30
+          ls -l app/build/outputs/bundle/release/
+          echo "versionCode: $HARU_VERSION_CODE"
+
+      - name: Check the signature
+        if: steps.key.outputs.signed == 'true'
+        working-directory: web/android/app/build/outputs/bundle/release
+        run: |
+          jarsigner -verify app-release.aab | tail -n 3
+          jarsigner -verify app-release.aab | grep -q "jar verified"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.key.outputs.signed == 'true' && 'haru-android-aab' || 'haru-android-aab-UNSIGNED' }}
+          path: web/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Unsigned bundles cannot go to Play
+        if: steps.key.outputs.signed != 'true'
+        run: |
+          echo "::error::The build works, but the bundle is unsigned. Add the three ANDROID_* signing secrets and run again."
+          exit 1

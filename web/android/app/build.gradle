@@ -12,7 +12,8 @@ android {
         applicationId "kr.haru.companion"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // CI passes HARU_VERSION_CODE (.github/workflows/android.yml); a local build falls back to 1.
+        versionCode Integer.parseInt(System.getenv('HARU_VERSION_CODE') ?: '1')
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

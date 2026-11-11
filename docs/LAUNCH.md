@@ -56,6 +56,13 @@
 
 ## Android를 다시 빌드해야 할 때
 
+**GitHub에서 (권장, PC에 JDK·SDK 필요 없음):** Actions 탭 → `Android → release bundle (AAB)` → Run workflow.
+`versionCode`는 비워 두면 실행 번호+1. 끝나면 실행 화면 아래 Artifacts의 `haru-android-aab`를 받아 Play Console에 올린다.
+서명용 저장소 Secrets 3개가 필요하다: `ANDROID_KEYSTORE_BASE64`(`haru-upload.jks`를 base64로), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD`(`키 정보.txt`의 값).
+없으면 서명 안 된 파일만 만들어지고 실행은 실패로 끝난다(빌드가 되는지 확인용).
+
+**이 PC에서 직접:**
+
 JDK 21과 Android SDK(platform 36, build-tools 35)가 필요하다.
 
 1. 소유자가 받은 `haru-upload.jks`를 저장소 **밖**에 두고, 같은 위치에 `keystore.properties`를 만든다(`키 정보.txt`의 값 사용).
@@ -67,7 +74,7 @@ keyAlias=haru-upload
 keyPassword=...
 ```
 
-2. `web/android/app/build.gradle`의 `versionCode`를 1 올린다(이미 올린 번호는 다시 쓸 수 없음).
+2. 환경 변수 `HARU_VERSION_CODE`에 이전보다 큰 번호를 준다(이미 올린 번호는 다시 쓸 수 없음, 기본 1).
 3. 빌드:
 
 ```bash
