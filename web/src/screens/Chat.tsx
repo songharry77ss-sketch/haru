@@ -5,6 +5,7 @@ import { Send } from '../components/Icons'
 import { api, type ChatMessage } from '../lib/api'
 import { isLook, lookForEmotion, moment, type LookId } from '../lib/expressions'
 import { asset, useHaru } from '../lib/store'
+import { faceCrop, useCharacter } from '../lib/characters'
 
 const STARTERS = ['오늘 학교에서 있었던 일 말해줄게', '요즘 좀 피곤해', '기분 좋은 일이 있었어!', '그냥 심심해']
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms))
@@ -19,6 +20,7 @@ const asBubbles = (m: ChatMessage): ChatMessage[] =>
 
 export function Chat({ onClose }: { onClose: () => void }) {
   const { state, apply, fail, showHelp, rewardToast } = useHaru()
+  const friend = useCharacter()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loaded, setLoaded] = useState(false)
   const [text, setText] = useState(() => {
@@ -147,7 +149,7 @@ export function Chat({ onClose }: { onClose: () => void }) {
       {state && (
         <div className="chat-pet" aria-hidden>
           <div className="chat-pet-clip">
-            <div className="chat-pet-box">
+            <div className="chat-pet-box" style={faceCrop(friend.rigs.stand)}>
               <Character
                 mood={state.pet.mood === 'hurt' ? 'worried' : state.pet.mood}
                 equipped={state.pet.equipped}
@@ -188,14 +190,14 @@ export function Chat({ onClose }: { onClose: () => void }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.18 }}
             >
-              {m.role === 'assistant' && <img className="avatar" src={asset('bunny_calm.webp')} alt="" />}
+              {m.role === 'assistant' && <img className="avatar" src={asset(friend.calm)} style={{ objectPosition: friend.avatarFocus }} alt="" />}
               <div className="bubble">{m.content || '​'}</div>
             </motion.div>
           ))}
         </AnimatePresence>
         {typing && (
           <div className="msg assistant">
-            <img className="avatar" src={asset('bunny_calm.webp')} alt="" />
+            <img className="avatar" src={asset(friend.calm)} style={{ objectPosition: friend.avatarFocus }} alt="" />
             <div className="bubble typing" aria-label={`${petName}가 입력 중`}>
               <span />
               <span />

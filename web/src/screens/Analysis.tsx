@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Chevron, Pencil, Trash } from '../components/Icons'
 import { Panel, Sheet } from '../components/Overlay'
 import { api, type Behavior, type DiaryEntry, type Emotion, type Report } from '../lib/api'
+import { useCharacter } from '../lib/characters'
 import { asset, useHaru } from '../lib/store'
 
 export const MOOD_FACE: Record<Emotion, { emoji: string; label: string }> = {
@@ -54,6 +55,7 @@ const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 
 function DiaryTab() {
   const { apply, fail, say, showHelp, rewardToast } = useHaru()
+  const friend = useCharacter()
   const [selected, setSelected] = useState(() => new Date())
   const [entries, setEntries] = useState<DiaryEntry[] | null>(null)
   const [writing, setWriting] = useState(false)
@@ -150,7 +152,7 @@ function DiaryTab() {
         {entries === null && <div className="skeleton" />}
         {entries !== null && dayEntries.length === 0 && (
           <div className="empty">
-            <img src={asset('bunny_calm.webp')} alt="" />
+            <img src={asset(friend.calm)} alt="" />
             <p>{isToday ? '오늘의 마음을 기록해 볼까요?' : '이 날은 기록이 없어요'}</p>
           </div>
         )}
@@ -364,6 +366,7 @@ function Radar({ axes }: { axes: Behavior['balance']['axes'] }) {
 }
 
 function Breathing({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const friend = useCharacter()
   const [phase, setPhase] = useState(0)
   useEffect(() => {
     if (!open) return
@@ -376,7 +379,7 @@ function Breathing({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Sheet open={open} onClose={onClose} label="숨 고르기">
       <div className="breathe">
         <motion.div className="breathe-orb" animate={{ scale: inhale ? 1.35 : 0.85 }} transition={{ duration: 4, ease: 'easeInOut' }}>
-          <img src={asset('bunny_calm.webp')} alt="" />
+          <img src={asset(friend.calm)} alt="" />
         </motion.div>
         <h2>{inhale ? '코로 천천히 들이마셔요' : '입으로 후— 내쉬어요'}</h2>
         <p className="muted">{Math.min(4, Math.floor(phase / 2) + 1)} / 4번째 숨</p>

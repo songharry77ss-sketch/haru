@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Close } from '../components/Icons'
 import { api } from '../lib/api'
 import { asset, useHaru } from '../lib/store'
+import { useCharacter } from '../lib/characters'
 
 const DURATION = 30_000
 type Drop = { id: number; x: number; y: number; vy: number; kind: 'carrot' | 'broccoli' | 'star' }
@@ -10,6 +11,7 @@ type Drop = { id: number; x: number; y: number; vy: number; kind: 'carrot' | 'br
 /** 당근 받기: move the pet left/right to catch falling treats. Short on purpose — play, then back to the room. */
 export function Play({ onClose }: { onClose: () => void }) {
   const { state, apply, say, rewardToast, fail } = useHaru()
+  const friend = useCharacter()
   const [phase, setPhase] = useState<'ready' | 'play' | 'done'>('ready')
   const [score, setScore] = useState(0)
   const [left, setLeft] = useState(DURATION)
@@ -111,7 +113,7 @@ export function Play({ onClose }: { onClose: () => void }) {
             {d.kind === 'carrot' ? <img src={asset('food_carrot.webp')} alt="" /> : d.kind === 'broccoli' ? <img src={asset('food_broccoli.webp')} alt="" /> : '⭐'}
           </span>
         ))}
-        <img className="catcher" src={asset(phase === 'done' ? 'bunny_happy.webp' : 'bunny_calm.webp')} alt="" style={{ left: `${px}%` }} />
+        <img className="catcher" src={asset(phase === 'done' ? friend.happy : friend.calm)} alt="" style={{ left: `${px}%` }} />
         <AnimatePresence>
           {phase !== 'play' && (
             <motion.div className="play-card" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}>

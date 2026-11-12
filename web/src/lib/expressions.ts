@@ -1,5 +1,6 @@
 /** Every face the pet can make, and which ones fit which moment. */
-import type { FaceLook, Rig } from '../components/Face'
+import type { FaceLook } from '../components/Face'
+import type { RigName as Rig } from './characters'
 import type { Emotion, Mood } from './api'
 
 export type Motion =

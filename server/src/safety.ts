@@ -70,7 +70,7 @@ const LEXICON: [Emotion, RegExp][] = [
   ["lonely", /외로|혼자|심심|친구가?\s*없|아무도/],
   ["angry", /화나|화가|짜증|열받|싫어|미워|억울/],
   ["tired", /피곤|지쳐|지친|졸려|잠이|귀찮|무기력|하기\s*싫/],
-  ["joy", /좋아|신나|행복|기뻐|재밌|재미있|최고|상\s*받|칭찬|뿌듯|설레|ㅋㅋ|ㅎㅎ/],
+  ["joy", /좋아|신나|행복|기뻐|재밌|재미있|최고|상\s*받|칭찬|뿌듯|설레|ㅋㅋ|ㅎㅎ|잘\s*(봤|했|됐|끝났)|성공|합격|이겼|해냈/],
 ];
 
 /** Topics that often come with a feeling but do not name one: they only tip the balance when nothing else is said. */

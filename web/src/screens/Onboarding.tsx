@@ -1,16 +1,17 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useState } from 'react'
-import { Back, Check, Lock } from '../components/Icons'
+import { useRef, useState } from 'react'
+import { Character, type CharacterHandle } from '../components/Character'
+import { FriendFace } from '../components/FriendFace'
+import { Back, Check } from '../components/Icons'
 import { Sheet } from '../components/Overlay'
 import { api } from '../lib/api'
+import { CHARACTERS, type CharacterId } from '../lib/characters'
+import { tap } from '../lib/native'
 import { asset, useHaru } from '../lib/store'
 
-const FRIENDS = [
-  { id: 'otter', name: '수달', img: 'card_otter.webp', ready: false },
-  { id: 'bunny', name: '토끼', img: 'bunny_calm.webp', ready: true },
-  { id: 'puppy', name: '강아지', img: 'card_puppy.webp', ready: false },
-  { id: 'pinkbunny', name: '분홍토끼', img: 'card_pinkbunny.webp', ready: false },
-]
+/** The order the friends stand in on the picker. */
+const FRIENDS: CharacterId[] = ['bunny', 'otter', 'puppy', 'pinkbunny']
+const DEFAULT_NAMES = new Set(Object.values(CHARACTERS).map((c) => c.defaultName))
 
 const AGES = [
   { id: 'child', label: '초등학생' },
@@ -21,8 +22,22 @@ const AGES = [
 export function Onboarding() {
   const { signIn, fail, toast } = useHaru()
   const [step, setStep] = useState(0)
-  const [friend, setFriend] = useState('bunny')
+  const [friend, setFriend] = useState<CharacterId>('bunny')
   const [petName, setPetName] = useState('하루')
+  const preview = useRef<CharacterHandle>(null)
+  const def = CHARACTERS[friend]
+
+  const choose = (id: CharacterId) => {
+    if (id === friend) {
+      preview.current?.bounce()
+      return
+    }
+    setFriend(id)
+    // The suggested name follows the friend until the child types one of their own.
+    setPetName((n) => (!n.trim() || DEFAULT_NAMES.has(n) ? CHARACTERS[id].defaultName : n))
+    tap()
+    window.setTimeout(() => preview.current?.pose('wave_hello', 1900), 60)
+  }
   const [nickname, setNickname] = useState('')
   const [age, setAge] = useState<(typeof AGES)[number]['id']>('teen')
   const [agree, setAgree] = useState(false)
@@ -95,10 +110,10 @@ export function Onboarding() {
               </h1>
               <motion.img
                 className="welcome-pet"
-                src={asset('bunny_happy.webp')}
-                alt="하루 토끼 캐릭터"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                src={asset('friends.webp')}
+                alt="하루의 친구들: 토끼, 수달, 강아지, 분홍토끼"
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
               />
               <div className="ob-actions">
                 <button className="btn block" onClick={next}>
@@ -119,28 +134,30 @@ export function Onboarding() {
                 친구를 골라줘
               </h1>
               <p className="ob-sub">마음에 드는 친구를 선택해보세요.</p>
-              <div className="friends">
-                {FRIENDS.map((f) => (
-                  <button
-                    key={f.id}
-                    className={`friend ${friend === f.id ? 'on' : ''} ${f.ready ? '' : 'soon'}`}
-                    onClick={() => (f.ready ? setFriend(f.id) : toast(`${f.name} 친구는 곧 만날 수 있어요!`))}
-                    aria-pressed={friend === f.id}
-                    aria-label={f.ready ? f.name : `${f.name} (준비 중)`}
-                  >
-                    <img src={asset(f.img)} alt="" />
-                    {friend === f.id && (
-                      <span className="friend-check">
-                        <Check />
-                      </span>
-                    )}
-                    {!f.ready && (
-                      <span className="soon-badge">
-                        <Lock size={12} /> 곧 만나요
-                      </span>
-                    )}
-                  </button>
-                ))}
+              <div className="pick-stage">
+                <div className="pick-glow" aria-hidden />
+                <div className="pick-pet">
+                  <Character ref={preview} character={friend} mood="happy" equipped={{}} interactive={false} quiet />
+                </div>
+              </div>
+              <motion.div className="pick-who" key={friend} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
+                <b>{def.name}</b>
+                <span>{def.blurb}</span>
+              </motion.div>
+              <div className="friends" role="radiogroup" aria-label="친구 고르기">
+                {FRIENDS.map((id) => {
+                  const f = CHARACTERS[id]
+                  return (
+                    <button key={id} role="radio" aria-checked={friend === id} className={`friend ${friend === id ? 'on' : ''}`} onClick={() => choose(id)} aria-label={f.name}>
+                      <FriendFace id={id} />
+                      {friend === id && (
+                        <span className="friend-check">
+                          <Check size={14} />
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
               <div className="ob-actions">
                 <button className="btn block" onClick={next}>
@@ -154,7 +171,7 @@ export function Onboarding() {
             <div className="ob-step">
               <h1 className="ob-title">친구의 이름을 지어줘</h1>
               <p className="ob-sub">언제든 설정에서 바꿀 수 있어요.</p>
-              <img className="name-pet" src={asset('bunny_calm.webp')} alt="" />
+              <img className="name-pet" src={asset(def.calm)} alt="" />
               <input className="field big" value={petName} maxLength={10} onChange={(e) => setPetName(e.target.value)} aria-label="친구 이름" autoFocus />
               <div className="ob-actions">
                 <button className="btn block" disabled={!petName.trim()} onClick={next}>
@@ -207,7 +224,9 @@ export function Onboarding() {
                   <span>정해진 시간이 지나면 {petName}는 잠자리에 들어요. 내일 또 만나요!</span>
                 </li>
                 <li>
-                  <b>🐰 {petName}는 AI 친구예요</b>
+                  <b>
+                    {def.emoji} {petName}는 AI 친구예요
+                  </b>
                   <span>사람이 아니고, 상담이나 치료를 대신하지 않아요.</span>
                 </li>
               </ul>

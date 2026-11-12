@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Check } from '../components/Icons'
 import { Sheet } from '../components/Overlay'
 import { asset, useHaru } from '../lib/store'
+import { useCharacter } from '../lib/characters'
 
 export function Quests({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state } = useHaru()
@@ -41,6 +42,7 @@ function untilMidnight() {
 /** "건강한 이별": once today's time is used up the pet goes to sleep until tomorrow. */
 export function RestMode({ onDiary }: { onDiary: () => void }) {
   const { state } = useHaru()
+  const friend = useCharacter()
   const [left, setLeft] = useState(untilMidnight())
   useEffect(() => {
     const id = window.setInterval(() => setLeft(untilMidnight()), 30_000)
@@ -54,7 +56,7 @@ export function RestMode({ onDiary }: { onDiary: () => void }) {
           <span key={i} style={{ left: `${(i * 41) % 100}%`, top: `${(i * 23) % 60}%`, animationDelay: `${(i % 6) * 0.5}s` }} />
         ))}
       </div>
-      <motion.img className="rest-pet" src={asset('bunny_calm.webp')} alt="" animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 4, repeat: Infinity }} />
+      <motion.img className="rest-pet" src={asset(friend.calm)} alt="" animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 4, repeat: Infinity }} />
       <div className="rest-zzz" aria-hidden>
         z z Z
       </div>

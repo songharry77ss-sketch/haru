@@ -225,7 +225,7 @@ export const api = {
   deleteDiary: (id: number) => request<{ ok: true }>(`/diary/${id}`, { method: 'DELETE' }),
   behavior: (days = 7) => request<Behavior>(`/analysis/behavior?days=${days}`),
   report: (days = 7) => request<Report>(`/analysis/report?days=${days}`),
-  settings: (body: { petName?: string; nickname?: string; dailyLimitMin?: number }) =>
+  settings: (body: { petName?: string; nickname?: string; dailyLimitMin?: number; character?: string }) =>
     request<AppState>('/settings', { method: 'PATCH', body }),
   deleteAccount: () => request<{ ok: true }>('/account', { method: 'DELETE' }),
   guardian: (code: string) =>

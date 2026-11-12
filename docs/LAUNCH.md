@@ -7,7 +7,7 @@
 
 | 항목 | 상태 |
 | --- | --- |
-| 코드 | 완료. `npm test` 18개 통과 |
+| 코드 | 완료. `npm test` 21개 통과 |
 | 웹 배포 | **됨** (2026-11-11). `https://haru-companion-kr.vercel.app`, Vercel 팀 `Harry's projects`, GitHub 연결됨. Neon DB `haru-companion-kr-db`(Singapore, Free) 연결. **`ANTHROPIC_API_KEY`만 아직 없음**: health의 `ai`가 `offline` |
 | Android | 서명된 출시 파일 `haru-1.0-release.aab`(versionCode 1) 빌드 완료. 파일과 업로드 키(`haru-android-signing-key.zip`)는 소유자에게 전달됨. Play Console 업로드는 아직 |
 | iOS | GitHub Actions 워크플로(`iOS → App Store Connect`) 준비됨. 저장소 Secrets 4개가 없어서 아직 빌드 못 함 |
@@ -33,6 +33,10 @@
   `android.yml`로 서명된 번들 생성(versionCode 4): `Downloads/haru-1.0-release-4.aab`.
 - Play Console 앱 콘텐츠: 개인정보처리방침·광고 없음·로그인 없음·광고 ID 미사용·정부 앱 아님·금융 기능 없음·건강(스트레스 관리·휴식·정신력)·콘텐츠 등급(전체이용가, 생성형 AI 콘텐츠 있음으로 응답) 저장.
   **멈춘 곳:** 타겟층 및 콘텐츠. 소유자가 9–12세 포함을 선택했고, 2단계의 "아동 관련 법(COPPA·GDPR 등) 준수 보증" 체크는 소유자 판단이 필요해 비워 둠. 데이터 보안, 스토어 등록정보(문구·그래픽), 번들 업로드는 아직.
+
+- 디자인(같은 날 오후): Figma `하루 UI/UX`의 친구 넷을 모두 고를 수 있게 함. 수달·강아지·분홍토끼는 Codex로 포즈 81장씩 생성(실시간 표정·꾸미기 포함),
+  친구 고르기 화면과 설정의 "함께하는 친구"에서 선택. 홈 하단을 흰 패널로 바꾸는 등 화면을 정리.
+  **스토어에 올린 빌드(iOS 5, Android 4)에는 이 변경이 없다.** 새 화면으로 내려면 두 워크플로를 다시 돌리고, 스크린샷(`store/`)도 새 화면으로 바꿔야 한다.
 
 ## 1. 웹 배포 (Vercel)
 

@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { FriendFace } from '../components/FriendFace'
 import { Check, Phone } from '../components/Icons'
 import { Panel, Sheet } from '../components/Overlay'
 import { PUBLIC_URL, api } from '../lib/api'
+import { CHARACTER_IDS, CHARACTERS } from '../lib/characters'
 import { LOOK_IDS } from '../lib/expressions'
 import { useHaru } from '../lib/store'
 import { Faces } from './Faces'
@@ -57,6 +59,27 @@ export function Settings({ onClose }: { onClose: () => void }) {
               </button>
             </div>
           </label>
+        </section>
+
+        <section className="card">
+          <h2 className="section-title">함께하는 친구</h2>
+          <p className="muted small">친구를 바꿔도 친밀감과 기록, 꾸미기 아이템은 그대로예요.</p>
+          <div className="friends" role="radiogroup" aria-label="친구 바꾸기">
+            {CHARACTER_IDS.map((id) => {
+              const f = CHARACTERS[id]
+              const on = user.character === id
+              return (
+                <button key={id} role="radio" aria-checked={on} className={`friend ${on ? 'on' : ''}`} onClick={() => !on && save({ character: id })} aria-label={f.name}>
+                  <FriendFace id={id} />
+                  {on && (
+                    <span className="friend-check">
+                      <Check size={14} />
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </section>
 
         <section className="card">

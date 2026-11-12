@@ -48,6 +48,12 @@ test("answers are split into short speech bubbles", () => {
 
 test("the built-in companion varies its lines and never suggests anything risky", () => {
   const ctx = { petName: "하루", species: "토끼", nickname: "솔", ageGroup: "teen", relationship: "친구", petMood: "편안함", fullness: 70, energy: 80, timeOfDay: "오후" };
+  // Good news about a test is good news, not worry.
+  assert.equal(offlineReply(ctx, "오늘 시험 잘 봤어").userEmotion, "joy");
+  // Each friend asks for its own snack when hungry.
+  assert.match(offlineReply({ ...ctx, species: "수달", fullness: 20 }, "배고파?").reply, /생선/);
+  assert.match(offlineReply({ ...ctx, species: "강아지", fullness: 20 }, "밥 먹었어?").reply, /간식/);
+  assert.match(offlineReply({ ...ctx, fullness: 20 }, "배고파?").reply, /당근/);
   const first = offlineReply(ctx, "오늘 너무 속상했어");
   assert.equal(first.userEmotion, "sad");
   assert.ok(first.bubbles.length >= 1 && first.reply === first.bubbles.join("\n"));

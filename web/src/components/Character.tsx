@@ -3,17 +3,10 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import type { Mood } from '../lib/api'
 import { IDLE, LOOKS, moment, pick, type Look, type LookId } from '../lib/expressions'
 import { idlePose, loadPose, poseFor, poseSrc, type PoseId, type PoseMoment } from '../lib/poses'
+import { rigOf, useCharacter, type CharacterId } from '../lib/characters'
 import { asset } from '../lib/store'
 import { AccessoryLayer, type Slot } from './Accessory'
-import { Face, RIGS } from './Face'
-
-// Warm the image cache so pose swaps never flash.
-if (typeof window !== 'undefined') {
-  for (const r of Object.values(RIGS)) {
-    const i = new Image()
-    i.src = asset(r.img)
-  }
-}
+import { Face } from './Face'
 
 export interface TouchSummary {
   strokes: number
@@ -57,15 +50,18 @@ interface Props {
   quiet?: boolean
   /** Hold this whole-body pose (previews). */
   heldPose?: PoseId
+  /** Show this friend instead of the signed-in child's own (the picker, previews). */
+  character?: CharacterId
 }
 
 let pid = 0
 const clamp = (v: number) => Math.max(-1, Math.min(1, v))
 
 export const Character = forwardRef<CharacterHandle, Props>(function Character(
-  { mood, equipped, onTouch, interactive = true, look: held, talking, quiet, heldPose },
+  { mood, equipped, onTouch, interactive = true, look: held, talking, quiet, heldPose, character },
   ref,
 ) {
+  const def = useCharacter(character)
   const controls = useAnimationControls()
   const [particles, setParticles] = useState<Particle[]>([])
   const box = useRef<HTMLDivElement>(null)
@@ -88,7 +84,15 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
 
   const id: LookId = held ?? stroking ?? reaction ?? idle ?? IDLE[mood][0]
   const look: Look = LOOKS[id]
-  const rig = look.rig ?? 'stand'
+  const { name: rigName, rig } = rigOf(def, look.rig)
+
+  // Warm the image cache so swaps between the standing renders never flash.
+  useEffect(() => {
+    for (const r of Object.values(def.rigs)) {
+      const i = new Image()
+      i.src = asset(r.img)
+    }
+  }, [def])
 
   const express = useCallback((next: LookId, ms = 2200) => {
     window.clearTimeout(reactionTimer.current)
@@ -98,13 +102,13 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
   const strike = useCallback((next: PoseId, ms = 2400) => {
     const turn = ++poseTurn.current
     // Shown only once the picture has arrived, and only if nothing newer was asked for meanwhile.
-    void loadPose(next).then(() => {
-      if (turn !== poseTurn.current) return
+    void loadPose(next, def).then((ok) => {
+      if (!ok || turn !== poseTurn.current) return
       window.clearTimeout(poseTimer.current)
       setPosing(next)
       poseTimer.current = window.setTimeout(() => setPosing(null), ms)
     })
-  }, [])
+  }, [def])
   const dropPose = useCallback(() => {
     poseTurn.current++
     window.clearTimeout(poseTimer.current)
@@ -203,7 +207,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
         window.setTimeout(() => spawn('heart', 35 + Math.random() * 30, 30 + Math.random() * 20), i * 110)
     },
     chomp: (food) => {
-      if (food === 'carrot') strike('eat_carrot', 1300)
+      if (food === def.treat) strike('eat_carrot', 1300)
       else {
         dropPose()
         express(moment('eating'), 1300)
@@ -226,7 +230,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
   const watch = (e: React.PointerEvent) => {
     const r = box.current?.getBoundingClientRect()
     if (!r) return
-    const face = RIGS[rig]
+    const face = rig
     const x = clamp((e.clientX - (r.left + (face.cx / 330) * r.width)) / (r.width * 0.3))
     const y = clamp((e.clientY - (r.top + (face.cy / 520) * r.height)) / (r.height * 0.2))
     setGaze((prev) => (prev && Math.abs(prev[0] - x) < 0.12 && Math.abs(prev[1] - y) < 0.12 ? prev : [x, y]))
@@ -322,7 +326,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
     s.timer = window.setTimeout(flush, 900)
   }
 
-  const img = RIGS[rig].img
+  const img = rig.img
   const shown = heldPose ?? (held ? null : posing)
   return (
     <div className="char-box" ref={box}>
@@ -332,7 +336,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
           <div className={`char-idle ${mood} ${shown ? 'm-breathe' : look.motion ? `m-${look.motion}` : ''}`}>
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.div
-                key={shown ? `pose-${shown}` : rig}
+                key={shown ? `pose-${def.id}-${shown}` : `${def.id}-${rigName}`}
                 className="char-pose"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -340,7 +344,7 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
                 transition={{ duration: 0.2 }}
               >
                 {shown ? (
-                  <img src={asset(poseSrc(shown))} alt="" className="char-img" draggable={false} />
+                  <img src={asset(poseSrc(shown, def))} alt="" className="char-img" draggable={false} />
                 ) : (
                   <>
                     <img src={asset(img)} alt="" className="char-img" draggable={false} />
@@ -350,10 +354,10 @@ export const Character = forwardRef<CharacterHandle, Props>(function Character(
               </motion.div>
             </AnimatePresence>
             {/* Outfits are fitted to the two standing poses; a picture pose is shown as it is. */}
-            {!shown && <AccessoryLayer equipped={equipped} pose={rig} />}
+            {!shown && <AccessoryLayer equipped={equipped} anchors={def.anchors[rigName] ?? def.anchors.stand} />}
             {mood === 'hungry' && !reaction && !held && !shown && (
               <div className="thought" aria-hidden>
-                <img src={asset('food_carrot.webp')} alt="" />
+                <img src={asset(`food_${def.treat}.webp`)} alt="" />
               </div>
             )}
             {mood === 'hurt' && <div className="pain" aria-hidden />}

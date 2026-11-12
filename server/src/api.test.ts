@@ -194,6 +194,21 @@ test("the daily limit puts the pet to rest, and a recovery code moves the accoun
   assert.equal((await call("/me", { token: restored.json.token })).status, 200);
 });
 
+test("the friend can be changed later, to one of the four only", async () => {
+  const { token } = await signUp();
+  const changed = await call("/settings", { token, method: "PATCH", body: { character: "otter" } });
+  assert.equal(changed.status, 200);
+  assert.equal(changed.json.user.character, "otter");
+  // Other settings leave the friend alone.
+  const renamed = await call("/settings", { token, method: "PATCH", body: { petName: "모모" } });
+  assert.equal(renamed.json.user.character, "otter");
+  assert.equal(renamed.json.user.petName, "모모");
+  assert.equal((await call("/settings", { token, method: "PATCH", body: { character: "dragon" } })).status, 400);
+  // A friend other than the bunny answers as itself.
+  const hello = await call("/chat", { token, body: { text: "안녕" } });
+  assert.ok(hello.json.reply.includes("🦦"), hello.json.reply);
+});
+
 test("deleting the account removes everything", async () => {
   const { token, user } = await signUp();
   await call("/chat", { token, body: { text: "안녕" } });

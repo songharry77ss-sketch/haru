@@ -611,16 +611,18 @@ api.patch(
         petName: z.string().trim().min(1).max(10).optional(),
         nickname: z.string().trim().min(1).max(12).optional(),
         dailyLimitMin: z.number().int().min(10).max(120).optional(),
+        character: z.enum(Object.keys(CHARACTERS) as [keyof typeof CHARACTERS]).optional(),
       }),
       req,
       res,
     );
     if (!body) return;
     const user = req.user!;
-    await query("UPDATE users SET pet_name = ?, nickname = ?, daily_limit_min = ? WHERE id = ?", [
+    await query("UPDATE users SET pet_name = ?, nickname = ?, daily_limit_min = ?, character = ? WHERE id = ?", [
       body.petName ?? user.pet_name,
       body.nickname ?? user.nickname,
       body.dailyLimitMin ?? user.daily_limit_min,
+      body.character ?? user.character,
       user.id,
     ]);
     res.json(await state(user.id));

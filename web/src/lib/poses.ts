@@ -1,5 +1,6 @@
 /** Whole-body poses rendered as pictures (web/public/img/pose). They play for a moment, then the live face returns. */
 import type { Mood } from './api'
+import type { CharacterDef } from './characters'
 import { pick } from './expressions'
 
 export const POSES = {
@@ -96,7 +97,8 @@ export const POSES = {
 export type PoseId = keyof typeof POSES
 export const POSE_IDS = Object.keys(POSES) as PoseId[]
 export const isPose = (v: unknown): v is PoseId => typeof v === 'string' && v in POSES
-export const poseSrc = (id: PoseId) => `pose/${id}.webp`
+/** Each friend has the same poses, drawn for it, in its own folder. */
+export const poseSrc = (id: PoseId, c: Pick<CharacterDef, 'poseDir'>) => `${c.poseDir}/${id}.webp`
 
 /** What the pet gets up to by itself, by mood. */
 const IDLE_POSES: Record<Mood, readonly PoseId[]> = {
@@ -133,17 +135,22 @@ export function greetingPose(hour: number, awayHours: number): PoseId {
   return pick('pose-hello', ['wave_hello', 'bow', 'clap'] as const)
 }
 
-const warmed = new Set<PoseId>()
-/** Loads the picture before it is shown, so the pet never flashes empty. */
-export function loadPose(id: PoseId): Promise<void> {
-  if (warmed.has(id)) return Promise.resolve()
-  return new Promise((ok) => {
+const warmed = new Map<string, boolean>()
+/** Loads the picture before it is shown, so the pet never flashes empty. Resolves false when there is no such picture. */
+export function loadPose(id: PoseId, c: Pick<CharacterDef, 'poseDir'>): Promise<boolean> {
+  const src = poseSrc(id, c)
+  const known = warmed.get(src)
+  if (known !== undefined) return Promise.resolve(known)
+  return new Promise((done) => {
     const im = new Image()
     im.onload = () => {
-      warmed.add(id)
-      ok()
+      warmed.set(src, true)
+      done(true)
     }
-    im.onerror = () => ok()
-    im.src = `/img/${poseSrc(id)}`
+    im.onerror = () => {
+      warmed.set(src, false)
+      done(false)
+    }
+    im.src = `/img/${src}`
   })
 }

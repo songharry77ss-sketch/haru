@@ -1,7 +1,8 @@
 /** Hand-drawn SVG outfits layered on top of the 3D character renders. */
 import type { JSX } from 'react'
+import type { Anchor, Slot } from '../lib/characters'
 
-export type Slot = 'hat' | 'face' | 'neck'
+export type { Slot }
 
 interface Def {
   slot: Slot
@@ -191,14 +192,8 @@ export const ACCESSORIES: Record<string, Def> = {
   },
 }
 
-/** Where each slot sits on a given pose, in fractions of the character box. */
-export type Pose = 'stand' | 'hug'
-export const ANCHORS: Record<Pose, Record<Slot, { x: number; y: number; rotate?: number }>> = {
-  stand: { hat: { x: 0.515, y: 0.405 }, face: { x: 0.515, y: 0.535 }, neck: { x: 0.505, y: 0.69 } },
-  hug: { hat: { x: 0.52, y: 0.33, rotate: -6 }, face: { x: 0.53, y: 0.465, rotate: -6 }, neck: { x: 0.52, y: 0.635, rotate: -4 } },
-}
-
-export function AccessoryLayer({ equipped, pose }: { equipped: Partial<Record<Slot, string>>; pose: Pose }) {
+/** Outfits on the friend, at the spots that friend's render gives for each slot (see lib/characters). */
+export function AccessoryLayer({ equipped, anchors }: { equipped: Partial<Record<Slot, string>>; anchors: Record<Slot, Anchor> }) {
   const order: Slot[] = ['neck', 'face', 'hat']
   return (
     <>
@@ -206,16 +201,17 @@ export function AccessoryLayer({ equipped, pose }: { equipped: Partial<Record<Sl
         const id = equipped[slot]
         const def = id ? ACCESSORIES[id] : undefined
         if (!def) return null
-        const a = ANCHORS[pose][slot]
+        const a = anchors[slot]
+        const size = a.size ?? 1
         const rot = (a.rotate ?? 0) + (def.rotate ?? 0)
         return (
           <div
             key={slot}
             className="acc"
             style={{
-              left: `${(a.x + (def.dx ?? 0)) * 100}%`,
-              top: `${(a.y + (def.dy ?? 0)) * 100}%`,
-              width: `${def.w * 100}%`,
+              left: `${(a.x + (def.dx ?? 0) * size) * 100}%`,
+              top: `${(a.y + (def.dy ?? 0) * size) * 100}%`,
+              width: `${def.w * size * 100}%`,
               transform: `translate(-50%, ${slot === 'hat' ? -100 : slot === 'face' ? -50 : -35}%) rotate(${rot}deg)`,
               transformOrigin: slot === 'hat' ? '50% 100%' : '50% 50%',
             }}

@@ -101,7 +101,7 @@ export function Home({ open, firstVisit }: { open: (o: Overlay) => void; firstVi
   }
 
   return (
-    <div className="screen home">
+    <div className={`screen home tray-${tray}`}>
       <Stage ref={charRef} mood={pet.mood} equipped={pet.equipped} theme={pet.theme} onTouch={onTouch}>
         <AnimatePresence>
           {bite && (

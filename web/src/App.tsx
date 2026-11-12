@@ -74,7 +74,7 @@ function Shell() {
 
 export default function App() {
   const guardian = location.pathname.match(/^\/guardian\/([A-Za-z0-9-]+)/)
-  if (import.meta.env.DEV && location.search === '?faces') return <FaceSheet />
+  if (import.meta.env.DEV && location.search.startsWith('?faces')) return <FaceSheet />
   return (
     <HaruProvider>
       <main className="frame">

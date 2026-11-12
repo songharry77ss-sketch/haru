@@ -347,6 +347,15 @@ const OFFLINE: Record<Emotion, { lines: string[]; mood: Mood; faces: Expression[
 
 const pick = <T,>(arr: readonly T[]) => arr[Math.floor(Math.random() * arr.length)];
 
+/** What differs by friend in the built-in replies: its emoji and what it asks for when hungry. */
+const KINDS: Record<string, { emoji: string; snack: string; snackEmoji: string }> = {
+  토끼: { emoji: "🐰", snack: "당근", snackEmoji: "🥕" },
+  분홍토끼: { emoji: "🐰", snack: "당근", snackEmoji: "🥕" },
+  수달: { emoji: "🦦", snack: "생선", snackEmoji: "🐟" },
+  강아지: { emoji: "🐶", snack: "간식", snackEmoji: "🦴" },
+};
+const kindOf = (species: string) => KINDS[species] ?? KINDS["토끼"];
+
 export function offlineReply(
   ctx: CompanionContext,
   text: string,
@@ -360,7 +369,7 @@ export function offlineReply(
   let reply = pick(fresh.length ? fresh : entry.lines);
   let expression: string = pick(entry.faces);
   if (/안녕|하이|hello|hi\b/i.test(text)) {
-    reply = `안녕 ${ctx.nickname}! 보고 싶었어 🐰 오늘 기분은 어때?`;
+    reply = `안녕 ${ctx.nickname}! 보고 싶었어 ${kindOf(ctx.species).emoji} 오늘 기분은 어때?`;
     expression = "hello";
   }
   if (/잘\s*자|굿나잇|자러/.test(text)) {
@@ -368,7 +377,8 @@ export function offlineReply(
     expression = "bye";
   }
   if (/배고|밥/.test(text) && ctx.fullness < 50) {
-    reply = "나 사실 조금 배고파… 당근 하나만 줄래? 🥕";
+    const k = kindOf(ctx.species);
+    reply = `나 사실 조금 배고파… ${k.snack} 하나만 줄래? ${k.snackEmoji}`;
     expression = "hungry";
   }
   const bubbles = toBubbles(reply);

@@ -4,8 +4,9 @@
  * expressions, and the face can blink, glance around, follow a finger and move its mouth while talking.
  */
 import { useEffect, useState, type JSX } from 'react'
+import type { RigDef, RigName } from '../lib/characters'
 
-export type Rig = 'stand' | 'hug'
+export type Rig = RigName
 export type EyeKind =
   | 'dot'
   | 'big'
@@ -78,13 +79,6 @@ export interface FaceLook {
   gaze?: [number, number]
 }
 
-/** Where the face sits on each pose, in the 330×520 box of the render. */
-export const RIGS: Record<Rig, { img: string; cx: number; cy: number; rot: number; scale: number; mouth: [number, number] }> = {
-  stand: { img: 'bunny_stand_base.webp', cx: 171.5, cy: 272.8, rot: 0, scale: 1, mouth: [0, 27.5] },
-  hug: { img: 'bunny_hug_base.webp', cx: 163.5, cy: 282.5, rot: -6.5, scale: 1.05, mouth: [-3, 33] },
-}
-
-const EYE_DX = 46.4
 const INK = '#4b2a22'
 const INSIDE = '#7a2f2c'
 const TONGUE = '#f59a9c'
@@ -293,7 +287,7 @@ const sparkle = (x: number, y: number, s: number, delay: number) => (
   </g>
 )
 
-function ExtraPart({ kind, mouthY }: { kind: Extra; mouthY: number }) {
+function ExtraPart({ kind, mouthY, eyeDx: EYE_DX }: { kind: Extra; mouthY: number; eyeDx: number }) {
   switch (kind) {
     case 'blush':
       return (
@@ -460,7 +454,8 @@ function ExtraPart({ kind, mouthY }: { kind: Extra; mouthY: number }) {
 }
 
 interface Props {
-  rig: Rig
+  /** Where the face sits on the render underneath (see lib/characters). */
+  rig: RigDef
   look: FaceLook
   /** Eyes pointed at something specific (a finger); overrides the look's own gaze. */
   gaze?: [number, number] | null
@@ -470,7 +465,8 @@ interface Props {
 }
 
 export function Face({ rig, look, gaze, talking, still }: Props) {
-  const r = RIGS[rig]
+  const r = rig
+  const EYE_DX = r.eyeDx
   const [shut, setShut] = useState(false)
   const [talkStep, setTalkStep] = useState(0)
   const pair = <T,>(v: T | [T, T]): [T, T] => (Array.isArray(v) ? v : [v, v])
@@ -510,7 +506,7 @@ export function Face({ rig, look, gaze, talking, still }: Props) {
 
   const [gx, gy] = gaze ?? look.gaze ?? [0, 0]
   const eye = (kind: EyeKind, side: -1 | 1) => (
-    <g transform={`translate(${side * EYE_DX} 0)`}>
+    <g transform={`translate(${side * EYE_DX} 0) scale(${r.eye})`}>
       <Eye kind={shut && OPEN_EYES.has(kind) ? 'line' : kind} side={side} gx={gx} gy={gy} />
     </g>
   )
@@ -526,19 +522,19 @@ export function Face({ rig, look, gaze, talking, still }: Props) {
         </radialGradient>
       </defs>
       <g transform={`translate(${r.cx} ${r.cy}) rotate(${r.rot}) scale(${r.scale})`}>
-        {look.extras?.filter((e) => e === 'blush' || e === 'puff').map((e) => <ExtraPart key={e} kind={e} mouthY={r.mouth[1]} />)}
+        {look.extras?.filter((e) => e === 'blush' || e === 'puff').map((e) => <ExtraPart key={e} kind={e} mouthY={r.mouth[1]} eyeDx={EYE_DX} />)}
         {eye(eyeL, -1)}
         {eye(eyeR, 1)}
-        <g transform={`translate(${-EYE_DX} 0)`}>
+        <g transform={`translate(${-EYE_DX} 0) scale(${r.eye})`}>
           <Brow kind={browL} side={-1} />
         </g>
-        <g transform={`translate(${EYE_DX} 0)`}>
+        <g transform={`translate(${EYE_DX} 0) scale(${r.eye})`}>
           <Brow kind={browR} side={1} />
         </g>
         <g transform={`translate(${r.mouth[0]} ${r.mouth[1]})`}>
           <Mouth kind={mouth} />
         </g>
-        {look.extras?.filter((e) => e !== 'blush' && e !== 'puff').map((e) => <ExtraPart key={e} kind={e} mouthY={r.mouth[1]} />)}
+        {look.extras?.filter((e) => e !== 'blush' && e !== 'puff').map((e) => <ExtraPart key={e} kind={e} mouthY={r.mouth[1]} eyeDx={EYE_DX} />)}
       </g>
     </svg>
   )
