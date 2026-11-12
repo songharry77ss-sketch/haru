@@ -29,7 +29,7 @@
   목록과 상황별 선택은 `lib/poses.ts`. 포즈가 나오는 동안에는 꾸미기 아이템을 그리지 않는다.
 - `web/android`, `web/ios` Capacitor 프로젝트. 앱 ID `kr.haru.companion`. 앱이 접속할 서버 주소는 `web/.env.native`
 - `scripts/build-vercel.mjs` Vercel 빌드, `vercel.json`이 이를 호출 → `main`에 push 하면 자동 배포
-- `store/` 스토어 스크린샷과 등록 문구(`STORE.md`)
+- `store/` 스토어 스크린샷과 등록 문구(`STORE.md`). 화면이 바뀌면 개발 서버를 켠 채 `node scripts/store-shots.mjs`로 홈·먹이·대화·꾸미기 장면을 다시 찍는다
 
 ## 지켜야 할 것
 
