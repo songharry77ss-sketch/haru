@@ -8,10 +8,10 @@
 | 항목 | 상태 |
 | --- | --- |
 | 코드 | 완료. `npm test` 21개 통과 |
-| 웹 배포 | **됨** (2026-11-11). `https://haru-companion-kr.vercel.app`, Vercel 팀 `Harry's projects`, GitHub 연결됨. Neon DB `haru-companion-kr-db`(Singapore, Free) 연결. **`ANTHROPIC_API_KEY`만 아직 없음**: health의 `ai`가 `offline` |
-| Android | 서명된 출시 파일 `haru-1.0-release.aab`(versionCode 1) 빌드 완료. 파일과 업로드 키(`haru-android-signing-key.zip`)는 소유자에게 전달됨. Play Console 업로드는 아직 |
-| iOS | GitHub Actions 워크플로(`iOS → App Store Connect`) 준비됨. 저장소 Secrets 4개가 없어서 아직 빌드 못 함 |
-| 스토어 자료 | `store/ios`, `store/android`에 스크린샷·아이콘, 문구와 양식 답변은 `store/STORE.md` |
+| 웹 배포 | **됨**. `https://haru-companion-kr.vercel.app`, Vercel 팀 `Harry's projects`, GitHub 연결됨. Neon DB `haru-companion-kr-db`(Singapore, Free), `ANTHROPIC_API_KEY` 등록됨. health: `{"ok":true,"db":"postgres","ai":"model"}` |
+| Android (Play) | **검토 전송함** (2026-11-13). 프로덕션 `5 (1.0)`(versionCode 5), 대한민국, 관리형 게시 꺼짐(승인되면 바로 공개). 결과는 Play Console → 게시 개요에서 확인 |
+| iOS (App Store) | **제출 직전에서 막힘** (2026-11-13). 버전 1.0에 빌드 6·스크린샷·문구·연락처·콘텐츠 권한·개인정보 게시까지 끝. "심사에 추가"를 누르면 "계약 업데이트" 안내만 뜨고 진행되지 않는다(아래 11-13 기록) |
+| 스토어 자료 | `store/ios`, `store/ios-6.3`, `store/android`에 스크린샷·아이콘, 문구와 양식 답변은 `store/STORE.md` |
 | AI 모델 | 미정. 소유자가 비용을 보고 정하기로 함(환경 변수 `CLAUDE_MODEL`) |
 
 ### 2026-11-11 진행 기록
@@ -47,6 +47,20 @@
   ② `Downloads/haru-1.0-release-5.aab`를 새 버전 화면에 끌어다 놓기(파일이 16MB라 자동 업로드 한도 10MB를 넘음), ③ 데이터 보안 최종 저장, ④ 게시 개요에서 검토 전송.
   스토어 스크린샷 순서가 올린 순서와 다르게 들어갔을 수 있으니(1-home이 맨 앞이어야 함) 등록정보에서 확인한다.
 
+### 2026-11-13 진행 기록
+
+- 소유자 결정: Play 대상 연령은 **초등학생 포함(9–12, 13–15, 16–17세)**, 아동 관련 법 준수 보증에 체크. App Store 콘텐츠 권한은 "타사 콘텐츠 없음".
+- Play Console: 번들 `haru-1.0-release-5.aab` 업로드(파일을 두 조각으로 나눠 올린 뒤 페이지에서 합침, 합친 파일의 SHA-256이 원본과 같음을 확인),
+  출시명 `5 (1.0)`, 출시 노트 저장. 타겟층 및 콘텐츠 저장(교사 추천 프로그램은 참여 안 함), 데이터 보안 최종 저장(가족 정책 약속 배지는 표시 안 함),
+  휴대전화 스크린샷 순서를 홈·먹이·대화·리포트·행동·일기·꾸미기로 맞춤. 게시 개요에서 **변경사항 10개를 검토로 전송**.
+  타겟층 양식 2단계의 "다음"은 번들을 올리기 전에는 눌러도 넘어가지 않았고, 번들을 올린 뒤에는 넘어갔다.
+- App Store Connect: 콘텐츠 권한 "아니요" 저장, 심사 연락처(같은 계정의 다른 앱에 등록된 연락처와 같은 값) 저장, 설명·키워드·심사 메모·프로모션 문구를 친구 넷 기준으로 교체,
+  스크린샷 7장을 `store/ios-6.3`의 새 파일로 교체, 빌드 6 선택, "앱이 수집하는 개인정보" 게시.
+  **막힌 곳:** "심사에 추가"를 누르면 "계약 업데이트: Apple Developer Program 사용권 계약이 업데이트되어 검토가 필요합니다"만 뜬다.
+  developer.apple.com의 계약 화면에는 사용권 계약이 2026-10-30에 수락된 것으로 나오고, App Store Connect 첫 화면에는 "개발자 정보 업데이트 처리 중"이라는 안내가 있다.
+  비즈니스 → CRAVING(신규 법인)의 무료·유료 앱 계약이 "대기 중(신규 법인)", 은행 계좌 "처리 중", 미국 세금 양식 두 개가 "세금 정보 없음"이다.
+  개인 → 법인 전환을 Apple이 처리하는 동안 제출이 막히는 것으로 보인다(추정). 소유자가 미국 세금 양식을 내고, 처리가 끝난 뒤 "심사에 추가" → 제출만 누르면 된다.
+
 ## 1. 웹 배포 (Vercel)
 
 1. <https://vercel.com/new> → GitHub로 로그인(Hobby 무료) → `songharry77ss-sketch/haru` Import.
@@ -74,7 +88,7 @@
 ## 3. Play Store
 
 1. <https://play.google.com/console> → 앱 만들기: `하루 - 마음을 알아주는 AI 친구`, 한국어, 앱, 무료.
-2. 스토어 등록정보와 앱 콘텐츠 양식은 `store/STORE.md`대로. 개인정보처리방침 `https://haru-companion-kr.vercel.app/privacy`, 계정 삭제 `https://haru-companion-kr.vercel.app/support#delete`, 타깃 연령은 13세 이상만.
+2. 스토어 등록정보와 앱 콘텐츠 양식은 `store/STORE.md`대로. 개인정보처리방침 `https://haru-companion-kr.vercel.app/privacy`, 계정 삭제 `https://haru-companion-kr.vercel.app/support#delete`, 타깃 연령은 9–17세(소유자 결정, 2026-11-13).
 3. 프로덕션 → 새 버전 → `haru-1.0-release.aab` 업로드(소유자가 파일 선택) → 출시 노트 `첫 출시`.
 4. **심사 제출은 소유자 확인 후.**
 
