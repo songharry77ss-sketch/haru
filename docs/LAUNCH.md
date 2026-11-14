@@ -9,8 +9,8 @@
 | --- | --- |
 | 코드 | 완료. `npm test` 21개 통과 |
 | 웹 배포 | **됨**. `https://haru-companion-kr.vercel.app`, Vercel 팀 `Harry's projects`, GitHub 연결됨. Neon DB `haru-companion-kr-db`(Singapore, Free), `ANTHROPIC_API_KEY` 등록됨. health: `{"ok":true,"db":"postgres","ai":"model"}` |
-| Android (Play) | **검토 전송함** (2026-11-13). 프로덕션 `5 (1.0)`(versionCode 5), 대한민국, 관리형 게시 꺼짐(승인되면 바로 공개). 결과는 Play Console → 게시 개요에서 확인 |
-| iOS (App Store) | **제출 직전에서 막힘** (2026-11-13). 버전 1.0에 빌드 6·스크린샷·문구·연락처·콘텐츠 권한·개인정보 게시까지 끝. "심사에 추가"를 누르면 "계약 업데이트" 안내만 뜨고 진행되지 않는다(아래 11-13 기록) |
+| Android (Play) | **검토 전송함** (2026-11-13), 2026-11-14에도 "검토 중". 프로덕션 `5 (1.0)`(versionCode 5), 대한민국, 관리형 게시 꺼짐(승인되면 바로 공개). 결과는 Play Console → 게시 개요에서 확인 |
+| iOS (App Store) | **제출 직전에서 막힘** (2026-11-14에도 같음). 버전 1.0에 빌드 6·스크린샷·문구·연락처·콘텐츠 권한·개인정보 게시까지 끝. "심사에 추가"를 누르면 "계약 업데이트" 안내만 뜨고 진행되지 않는다. 원인은 Apple 쪽 법인 전환 미완료(아래 11-14 기록). 소유자가 미국 세금 양식 두 개를 내야 한다 |
 | 스토어 자료 | `store/ios`, `store/ios-6.3`, `store/android`에 스크린샷·아이콘, 문구와 양식 답변은 `store/STORE.md` |
 | AI 모델 | 미정. 소유자가 비용을 보고 정하기로 함(환경 변수 `CLAUDE_MODEL`) |
 
@@ -60,6 +60,24 @@
   developer.apple.com의 계약 화면에는 사용권 계약이 2026-10-30에 수락된 것으로 나오고, App Store Connect 첫 화면에는 "개발자 정보 업데이트 처리 중"이라는 안내가 있다.
   비즈니스 → CRAVING(신규 법인)의 무료·유료 앱 계약이 "대기 중(신규 법인)", 은행 계좌 "처리 중", 미국 세금 양식 두 개가 "세금 정보 없음"이다.
   개인 → 법인 전환을 Apple이 처리하는 동안 제출이 막히는 것으로 보인다(추정). 소유자가 미국 세금 양식을 내고, 처리가 끝난 뒤 "심사에 추가" → 제출만 누르면 된다.
+
+### 2026-11-14 진행 기록
+
+- Play: 게시 개요가 여전히 "변경사항을 검토 중입니다". 할 일 없음.
+  별개로 Play Console 알림에 "결제 프로필: 지급 보류, 신원 확인 필요"(2026-11-06)가 있다. 수익 지급에 관한 것이고 신분증 확인은 소유자만 할 수 있다. 무료 앱 심사를 막는다는 표시는 없다.
+- App Store: "심사에 추가"는 여전히 "계약 업데이트" 안내에 막힌다. 버튼을 눌러도 서버 요청이 나가지 않고, 페이지가 처음 받아 온 계정 상태로 막는다.
+  - 확인한 값: `ra/v1/providerCapabilities`의 `contractStatus`가 `FREE_APP_AGREEMENT_OUTDATED`, `companyName`이 아직 예전 개인 명의(HYEONSEOP SONG).
+    `agreementsStatus/v2`에서 신규 법인(CRAVING)의 무료·유료 앱 계약은 `NotInEffect`, 예전 명의의 계약은 `InEffect`.
+    `olympus/v1/contractMessages`에는 "개발자 정보 업데이트 처리 중 … 처리가 완료될 때까지 업데이트된 Program License Agreement의 효력이 발생하지 않을 수 있습니다".
+  - developer.apple.com 계정: 법인명 CRAVING, 등록 유형 조직, 사용권 계약 2026-10-30 발행·수락. 수락할 계약은 남아 있지 않다.
+  - 즉 앱이나 제출 자료의 문제가 아니라 **계정의 법인 전환이 App Store Connect에 아직 반영되지 않은 것**이다.
+    Apple 도움말(Sign and update agreements)은 법인 정보 변경이 승인된 뒤 반영까지 최대 2주가 걸리고, 바뀐 세금·은행 정보를 내라고 안내한다. 10-29 기준 2주는 이미 지났다.
+  - 남아 있는 소유자 몫: 비즈니스 → CRAVING → 세금 양식의 미국 양식 두 개("세금 정보 없음").
+    ① U.S. Certificate of Foreign Status of Beneficial Owner: 법인 유형 선택, 서명자 직함 입력, 미국 내 직원·자산이 없다는 선언. 납세번호 칸은 없다.
+    ② U.S. Substitute Form W-8BEN-E: 법인 유형, 외국 납세번호(9b), 조세조약 혜택 선택(Part III), 위증 시 처벌 조건의 서명.
+    둘 다 "제출 후에는 변경할 수 없음"이고 대표자의 법적 선언이라 Claude는 열어 보기만 하고 입력·제출하지 않았다.
+  - 세금 양식을 내면 풀리는지는 확인되지 않았다(Apple 안내문상 필요한 절차이긴 하다). 제출하고 하루쯤 지나도 그대로면 Apple Developer Support(멤버십 및 계정 → 계약)에 법인 전환이 멈춰 있다고 문의한다.
+  - 풀리면 할 일은 그대로: 버전 1.0 화면에서 "심사에 추가" → 제출.
 
 ## 1. 웹 배포 (Vercel)
 
