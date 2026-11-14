@@ -16,7 +16,7 @@
 | 개인정보처리방침 URL | `https://haru-companion-kr.vercel.app/privacy` |
 | 지원 URL | `https://haru-companion-kr.vercel.app/support` |
 | 계정 삭제 URL (Play) | `https://haru-companion-kr.vercel.app/support#delete` |
-| 저작권 | © 2026 (주)하루 |
+| 저작권 | 2026 CRAVING (App Store Connect에 입력된 값). 사업자 상호는 크레이빙이고 주식회사가 아니므로 "(주)"를 붙이지 않는다 |
 
 ## 설명 (두 스토어 공통)
 
